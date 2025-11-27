@@ -1,0 +1,11 @@
+pandas
+numpy
+streamlit
+plotly
+openpyxl
+pandera
+statsmodels
+matplotlib
+google-generativeai
+openai
+scikit-learn
