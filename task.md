@@ -56,8 +56,21 @@
   - [x] Tela de solicitação de remanejamento
   - [x] Visão OBZ Light (Justificativa de gastos por pacote)
 
+## ✅ Fase 8.1: Visualização de Dados (Novo Requisito)
+
+- [x] Criar página `04_📚_Biblia_Financeira.py` (Orçamento 2026 + Metadados)
+
 ## 📊 Fase 8: Consolidação e Histórico
 
 - [x] Processar P&L Dez/2025 para histórico comparativo
 - [ ] Preparar ingestão do P&L Jan/2026 (nova estrutura)
 - [ ] Testes integrados de todas as funcionalidades
+
+## ✅ Fase 9: Reestruturação Conceitual e UI (Feedback Usuário)
+
+- [x] Criar biblioteca de UI (`utils_ui.py`)
+- [x] Refatorar `Home.py` (Remover upload obsoleto, novo design)
+- [x] Refatorar `02_Lancamentos.py` (Foco em Provisões/Compromissos)
+- [x] Refatorar `05_Controle_Orcamentario.py` (Foco em Remanejamentos, remover redundâncias)
+- [x] Unificar UI Global (Estilo Premium em todas as páginas)
+- [x] Refatorar `01_Analise_Financeira.py` (Aplicar UI Premium)

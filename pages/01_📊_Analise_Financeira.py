@@ -1,9 +1,7 @@
 """
 01_📊_Analise_Financeira.py
 ============================
-Módulo principal de análise financeira (Multi-Page).
-
-Esta página é detectada automaticamente pelo Streamlit através da pasta pages/.
+Módulo principal de análise financeira (Refatorado para UI Premium).
 """
 
 import pandas as pd
@@ -21,75 +19,18 @@ from utils_financeiro import (
     MESES_ORDEM,
     criar_interface_forecasting_simples
 )
+from utils_ui import (
+    setup_page,
+    exibir_kpi_card,
+    formatar_valor_brl,
+    CORES
+)
 
 # =============================================================================
 # CONFIGURAÇÃO
 # =============================================================================
 
-st.set_page_config(
-    layout="wide",
-    page_title="Análise Financeira",
-    page_icon="📊"
-)
-
-st.markdown("""
-    <style>
-        /* Global Settings */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        
-        html, body, [class*="css"] {
-            font-family: 'Inter', sans-serif;
-        }
-        
-        /* Premium Dark Theme Adjustments */
-        .stApp {
-            background-color: #0E1117;
-        }
-        
-        /* Headers */
-        h1, h2, h3 {
-            color: #FAFAFA;
-            font-weight: 700;
-        }
-        
-        h1 {
-            color: #4F8BF9;
-            padding-bottom: 10px;
-        }
-        
-        /* Cards */
-        .css-1r6slb0, .css-12w0qpk {
-            background-color: #1E2130;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-            border: 1px solid #2E3245;
-        }
-        
-        /* Metrics */
-        [data-testid="stMetricValue"] {
-            font-size: 24px;
-            color: #4F8BF9;
-        }
-        
-        /* Custom Classes */
-        .card {
-            background-color: #1E2130;
-            padding: 20px;
-            border-radius: 10px;
-            border: 1px solid #2E3245;
-            margin-bottom: 20px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# =============================================================================
-# CABEÇALHO
-# =============================================================================
-
-st.title("📊 Módulo de Análise Financeira")
-st.markdown("Visão completa da performance orçamentária, custos, resultados e projeções futuras.")
-st.markdown("---")
+setup_page("Análise Financeira", "📊")
 
 # =============================================================================
 # VERIFICAR DADOS NA SESSÃO
@@ -106,16 +47,28 @@ if pl_df is None and df_orc_proc is None:
     st.info("👈 Retorne à página inicial (Home) para fazer o upload dos arquivos.")
     st.stop()
 
-# Status rápido
+# Status rápido com Cards Premium
 col_st1, col_st2, col_st3 = st.columns(3)
 with col_st1:
-    st.metric("📊 P&L", f"{len(pl_df):,} linhas" if pl_df is not None else "Não carregado")
+    exibir_kpi_card(
+        "Dados P&L", 
+        f"{len(pl_df):,} linhas" if pl_df is not None else "N/A", 
+        "Registros Contábeis"
+    )
 with col_st2:
-    st.metric("📝 Razão", f"{len(razao_df):,} linhas" if razao_df is not None else "Não carregado")
+    exibir_kpi_card(
+        "Dados Razão", 
+        f"{len(razao_df):,} linhas" if razao_df is not None else "N/A", 
+        "Detalhe por Fornecedor"
+    )
 with col_st3:
-    st.metric("💰 Orçamento", f"{len(df_orc_proc):,} linhas" if df_orc_proc is not None else "Não carregado")
+    exibir_kpi_card(
+        "Dados Orçamento", 
+        f"{len(df_orc_proc):,} linhas" if df_orc_proc is not None else "N/A", 
+        "Base Orçamentária"
+    )
 
-st.markdown("---")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # =============================================================================
 # ABAS PRINCIPAIS
@@ -133,6 +86,8 @@ tabs = st.tabs([
 # -----------------------------------------------------------------------------
 
 with tabs[0]:
+    st.markdown('<div class="section-header"><span class="section-title">Análise de Performance (P&L)</span></div>', unsafe_allow_html=True)
+    
     if pl_df is not None and not pl_df.empty:
         
         # Separar custos e financeiro
@@ -153,24 +108,25 @@ with tabs[0]:
         
         numero_meses_passados = MESES_ORDEM.index(ultimo_mes_realizado) + 1 if ultimo_mes_realizado else 0
         
-        st.info(f"📅 **Último mês realizado detectado:** {ultimo_mes_realizado} ({numero_meses_passados} meses acumulados)")
-        st.divider()
+        if ultimo_mes_realizado:
+            st.info(f"📅 **Último mês realizado:** {ultimo_mes_realizado} ({numero_meses_passados} meses acumulados)")
         
         # FILTROS
-        st.subheader("🔍 Filtros de Análise")
-        col1_filter, col2_filter, col3_filter = st.columns(3)
-        
-        with col1_filter:
-            lista_centros_custo = ['Visão Geral (Consolidado)'] + sorted(df_custos['centro_gasto_nome'].dropna().unique().tolist())
-            centro_custo_selecionado = st.selectbox("Centro de Custo", lista_centros_custo)
-        
-        with col2_filter:
-            lista_contas_contabeis = ['Visão Geral (Consolidado)'] + sorted(df_custos['conta_contabil'].unique().tolist())
-            conta_contabil_selecionada = st.selectbox("Conta Contábil", lista_contas_contabeis)
-        
-        with col3_filter:
-            opcoes_periodo = ['YTD (Acumulado do Ano)'] + MESES_ORDEM
-            periodo_selecionado = st.selectbox("Período", opcoes_periodo)
+        with st.container():
+            st.markdown("#### 🔍 Filtros de Análise")
+            col1_filter, col2_filter, col3_filter = st.columns(3)
+            
+            with col1_filter:
+                lista_centros_custo = ['Visão Geral (Consolidado)'] + sorted(df_custos['centro_gasto_nome'].dropna().unique().tolist())
+                centro_custo_selecionado = st.selectbox("Centro de Custo", lista_centros_custo)
+            
+            with col2_filter:
+                lista_contas_contabeis = ['Visão Geral (Consolidado)'] + sorted(df_custos['conta_contabil'].unique().tolist())
+                conta_contabil_selecionada = st.selectbox("Conta Contábil", lista_contas_contabeis)
+            
+            with col3_filter:
+                opcoes_periodo = ['YTD (Acumulado do Ano)'] + MESES_ORDEM
+                periodo_selecionado = st.selectbox("Período", opcoes_periodo)
         
         st.divider()
         
@@ -209,24 +165,35 @@ with tabs[0]:
             ])
             
             with sub_tabs[0]:  # Dashboard
-                st.header(f"Dashboard: {centro_custo_selecionado} | {conta_contabil_selecionada}")
-                st.caption(f"Período: {periodo_selecionado}")
+                st.markdown(f"### {centro_custo_selecionado}")
+                st.caption(f"Conta: {conta_contabil_selecionada} | Período: {periodo_selecionado}")
                 
                 total_realizado = df_custos_filtrado.query("tipo_valor == 'Realizado'")['valor'].sum()
                 total_budget = df_custos_filtrado.query("tipo_valor == 'Budget V3'")['valor'].sum()
                 total_budget_v1 = df_custos_filtrado.query("tipo_valor == 'Budget V1'")['valor'].sum()
                 variacao = ((total_realizado - total_budget) / total_budget * 100) if total_budget != 0 else 0
                 
+                # KPIs com visual premium
                 col1, col2, col3, col4 = st.columns(4)
-                col1.metric("💰 Realizado", f"R$ {total_realizado:,.2f}")
-                col2.metric("🎯 Budget V3", f"R$ {total_budget:,.2f}")
-                col3.metric("📊 Budget V1", f"R$ {total_budget_v1:,.2f}")
-                col4.metric("📈 Variação V3", f"{variacao:.2f}%", delta=f"{variacao:.2f}%")
+                with col1: exibir_kpi_card("Realizado", formatar_valor_brl(total_realizado), "Total Gasto")
+                with col2: exibir_kpi_card("Budget V3", formatar_valor_brl(total_budget), "Meta Vigente")
+                with col3: exibir_kpi_card("Budget V1", formatar_valor_brl(total_budget_v1), "Meta Inicial")
                 
-                st.divider()
+                # Card de variação com cor condicional
+                cor_var = CORES['success'] if variacao <= 0 else CORES['danger']
+                delta_sym = "▼" if variacao <= 0 else "▲"
+                with col4: 
+                    st.markdown(f"""
+<div style="background-color: {CORES['card_bg']}; padding: 20px; border-radius: 12px; border: 1px solid {CORES['border']};">
+    <div style="color: {CORES['text_secondary']}; font-size: 14px;">Variação V3</div>
+    <div style="font-size: 24px; font-weight: bold; color: {cor_var};">{delta_sym} {abs(variacao):.2f}%</div>
+    <div style="color: {CORES['text_secondary']}; font-size: 12px;">vs Meta</div>
+</div>
+""", unsafe_allow_html=True)
                 
-                st.subheader("📈 Evolução Temporal")
+                st.markdown("<br>", unsafe_allow_html=True)
                 
+                # Gráficos
                 if periodo_selecionado == 'YTD (Acumulado do Ano)':
                     df_grafico = df_custos_filtrado.groupby(['mes', 'tipo_valor'])['valor'].sum().reset_index()
                     df_grafico['mes'] = pd.Categorical(df_grafico['mes'], categories=MESES_ORDEM, ordered=True)
@@ -234,13 +201,13 @@ with tabs[0]:
                     fig = px.line(
                         df_grafico, x='mes', y='valor', color='tipo_valor',
                         markers=True,
-                        title=f"Evolução Mensal: {centro_custo_selecionado} | {conta_contabil_selecionada}",
+                        title=f"Evolução Mensal",
                         labels={'valor': 'Valor (R$)', 'mes': 'Mês', 'tipo_valor': 'Versão'},
                         color_discrete_map={
-                            'Realizado': '#1f77b4',
-                            'Budget V1': '#ff7f0e',
-                            'Budget V3': '#2ca02c',
-                            'LY - Actual': '#d62728'
+                            'Realizado': CORES['primary'],
+                            'Budget V1': CORES['warning'],
+                            'Budget V3': CORES['success'],
+                            'LY - Actual': CORES['danger']
                         }
                     )
                 else:
@@ -249,15 +216,20 @@ with tabs[0]:
                         df_grafico, x='tipo_valor', y='valor', color='tipo_valor',
                         title=f"Comparativo no Mês de {periodo_selecionado}",
                         labels={'valor': 'Valor (R$)', 'tipo_valor': 'Versão'},
-                        text_auto='.2s'
+                        text_auto='.2s',
+                        color_discrete_map={
+                            'Realizado': CORES['primary'],
+                            'Budget V1': CORES['warning'],
+                            'Budget V3': CORES['success'],
+                            'LY - Actual': CORES['danger']
+                        }
                     )
                 
+                fig.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
                 st.plotly_chart(fig, use_container_width=True)
             
             with sub_tabs[1]:  # Despesas Detalhadas
-                st.header("💵 Análise Detalhada de Despesas")
-                
-                st.subheader("📊 Resumo Mensal Consolidado")
+                st.subheader("💵 Detalhamento de Despesas")
                 summary_pivot = df_custos_filtrado.pivot_table(
                     values='valor',
                     index='tipo_valor',
@@ -270,494 +242,160 @@ with tabs[0]:
                     summary_pivot['Total'] = summary_pivot.sum(axis=1)
                     st.dataframe(summary_pivot.style.format("R$ {:,.2f}"), use_container_width=True)
                 else:
-                    st.info("Nenhum dado disponível para o filtro selecionado.")
+                    st.info("Nenhum dado disponível.")
                 
-                st.divider()
-                st.subheader("🔍 Performance por Conta Contábil")
-                
+                st.markdown("#### Performance por Conta Contábil")
                 tipos_disponiveis = df_custos_filtrado['tipo_valor'].unique().tolist()
-                tipos_selecionados = st.multiselect(
-                    "Selecione os Tipos de Valor:",
-                    options=tipos_disponiveis,
-                    default=tipos_disponiveis
-                )
+                tipos_selecionados = st.multiselect("Tipos de Valor:", tipos_disponiveis, default=tipos_disponiveis)
                 
                 if tipos_selecionados:
                     df_detalhada = df_custos_filtrado[df_custos_filtrado['tipo_valor'].isin(tipos_selecionados)].copy()
-                    
                     df_detalhada['mes'] = pd.Categorical(df_detalhada['mes'], categories=MESES_ORDEM, ordered=True)
-                    
-                    df_pivot = df_detalhada.pivot_table(
-                        index=['conta_contabil', 'tipo_valor'],
-                        columns='mes',
-                        values='valor',
-                        aggfunc='sum'
-                    ).fillna(0)
-                    
-                    df_pivot = df_pivot.sort_index(level='conta_contabil')
-                    
-                    if not df_pivot.empty:
-                        st.dataframe(df_pivot.style.format("R$ {:,.2f}"), use_container_width=True)
-                    else:
-                        st.info("Nenhum dado disponível para os tipos selecionados.")
-                    
-                    st.divider()
-                    
-                    # Top Agressores
-                    st.subheader("🎯 Top Agressores (Maiores Desvios)")
-                    top_n = st.slider("Número de agressores:", 3, 20, 5, key='top_agressores')
-                    
-                    df_pivot_desvio = df_custos_filtrado[
-                        df_custos_filtrado['tipo_valor'].isin(['Realizado', 'Budget V3'])
-                    ].pivot_table(
-                        index='conta_contabil',
-                        columns='tipo_valor',
-                        values='valor',
-                        aggfunc='sum'
-                    ).fillna(0)
-                    
-                    if 'Realizado' in df_pivot_desvio.columns and 'Budget V3' in df_pivot_desvio.columns:
-                        df_pivot_desvio['Desvio (R$)'] = df_pivot_desvio['Realizado'] - df_pivot_desvio['Budget V3']
-                        df_pivot_desvio['Desvio (%)'] = (df_pivot_desvio['Desvio (R$)'] / df_pivot_desvio['Budget V3'] * 100).replace([float('inf'), -float('inf')], 0)
-                        df_pivot_desvio['Desvio (Absoluto)'] = df_pivot_desvio['Desvio (R$)'].abs()
-                        
-                        df_agressores = df_pivot_desvio.sort_values(by='Desvio (Absoluto)', ascending=False).head(top_n)
-                        
-                        if not df_agressores.empty:
-                            df_agressores_melted = df_agressores.reset_index().melt(
-                                id_vars='conta_contabil',
-                                value_vars=['Realizado', 'Budget V3'],
-                                var_name='Tipo',
-                                value_name='Valor'
-                            )
-                            
-                            fig_agressores = px.bar(
-                                df_agressores_melted,
-                                x='conta_contabil',
-                                y='Valor',
-                                color='Tipo',
-                                barmode='group',
-                                title=f"Top {top_n} Agressores - Realizado vs Budget V3",
-                                text_auto='.2s',
-                                color_discrete_map={'Realizado': '#1f77b4', 'Budget V3': '#2ca02c'}
-                            )
-                            fig_agressores.update_xaxes(tickangle=-45)
-                            st.plotly_chart(fig_agressores, use_container_width=True)
-                            
-                            st.dataframe(
-                                df_agressores[['Realizado', 'Budget V3', 'Desvio (R$)', 'Desvio (%)']].style.format({
-                                    'Realizado': 'R$ {:,.2f}',
-                                    'Budget V3': 'R$ {:,.2f}',
-                                    'Desvio (R$)': 'R$ {:,.2f}',
-                                    'Desvio (%)': '{:.2f}%'
-                                }),
-                                use_container_width=True
-                            )
-                        else:
-                            st.info("Nenhum agressor identificado.")
-                    else:
-                        st.info("Dados de Realizado ou Budget V3 não disponíveis para comparação.")
+                    df_pivot = df_detalhada.pivot_table(index=['conta_contabil', 'tipo_valor'], columns='mes', values='valor', aggfunc='sum').fillna(0)
+                    st.dataframe(df_pivot.style.format("R$ {:,.2f}"), use_container_width=True)
             
             with sub_tabs[2]:  # Fornecedores
-                st.header("🏢 Análise por Fornecedor")
-                
+                st.subheader("🏢 Análise por Fornecedor")
                 if not razao_filtrado.empty:
-                    st.subheader("📊 Top 10 Fornecedores")
                     top_fornecedores = razao_filtrado.groupby('fornecedor')['valor'].sum().nlargest(10).reset_index()
-                    
                     fig_fornec = px.bar(
-                        top_fornecedores,
-                        x='valor',
-                        y='fornecedor',
-                        orientation='h',
-                        title="Top 10 Fornecedores por Valor Total",
-                        labels={'valor': 'Valor (R$)', 'fornecedor': 'Fornecedor'},
-                        text_auto='.2s',
-                        color='valor',
-                        color_continuous_scale='Blues'
+                        top_fornecedores, x='valor', y='fornecedor', orientation='h',
+                        title="Top 10 Fornecedores", labels={'valor': 'Valor (R$)', 'fornecedor': 'Fornecedor'},
+                        text_auto='.2s', color='valor', color_continuous_scale='Blues'
                     )
-                    fig_fornec.update_layout(showlegend=False)
+                    fig_fornec.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", showlegend=False)
                     st.plotly_chart(fig_fornec, use_container_width=True)
                     
-                    st.divider()
-                    st.subheader("📋 Detalhes dos Lançamentos por Fornecedor")
-                    
-                    fornecedor_selecionado = st.selectbox(
-                        "Selecione um fornecedor:",
-                        ['Todos'] + sorted(razao_filtrado['fornecedor'].dropna().unique().tolist())
-                    )
-                    
-                    if fornecedor_selecionado != 'Todos':
-                        razao_detalhado = razao_filtrado[razao_filtrado['fornecedor'] == fornecedor_selecionado]
-                    else:
-                        razao_detalhado = razao_filtrado
-                    
-                    st.dataframe(razao_detalhado, use_container_width=True)
-                    
-                    # Exportar
-                    csv_razao = razao_detalhado.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        "📥 Baixar Dados de Fornecedores (CSV)",
-                        csv_razao,
-                        f"fornecedores_{fornecedor_selecionado}.csv",
-                        "text/csv"
-                    )
+                    st.markdown("#### Detalhes dos Lançamentos")
+                    fornecedor_sel = st.selectbox("Filtrar Fornecedor:", ['Todos'] + sorted(razao_filtrado['fornecedor'].dropna().unique().tolist()))
+                    df_f = razao_filtrado if fornecedor_sel == 'Todos' else razao_filtrado[razao_filtrado['fornecedor'] == fornecedor_sel]
+                    st.dataframe(df_f, use_container_width=True)
                 else:
-                    st.info("Dados de Razão (Fornecedores) não disponíveis.")
+                    st.info("Dados de Razão não disponíveis.")
             
             with sub_tabs[3]:  # Visualizações
-                st.header("📈 Visualizações Avançadas")
-                
-                st.subheader("🗺️ Estrutura de Custos (Treemap)")
+                st.subheader("📈 Visualizações Avançadas")
                 df_treemap = df_custos_filtrado.query("tipo_valor == 'Realizado' and valor > 0")
                 if not df_treemap.empty:
-                    fig_treemap = px.treemap(
-                        df_treemap,
-                        path=[px.Constant("Total"), 'centro_gasto_nome', 'conta_contabil'],
-                        values='valor',
-                        title='Composição Hierárquica dos Custos Realizados',
-                        color='valor',
-                        color_continuous_scale='RdYlGn_r'
+                    fig_tm = px.treemap(
+                        df_treemap, path=[px.Constant("Total"), 'centro_gasto_nome', 'conta_contabil'],
+                        values='valor', title='Hierarquia de Custos (Realizado)', color='valor', color_continuous_scale='RdYlGn_r'
                     )
-                    st.plotly_chart(fig_treemap, use_container_width=True)
-                else:
-                    st.info("Nenhum dado disponível para o Treemap.")
-                
-                st.divider()
-                st.subheader("📉 Decomposição Temporal (STL)")
-                st.caption("Análise de tendência, sazonalidade e resíduos")
+                    fig_tm.update_layout(template="plotly_dark")
+                    st.plotly_chart(fig_tm, use_container_width=True)
                 
                 if not pl_df.empty and 'data' in pl_df.columns:
                     try:
                         fig_stl = plot_stl_decomposition(pl_df, 'data', 'valor')
+                        fig_stl.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
                         st.plotly_chart(fig_stl, use_container_width=True)
-                    except Exception as e:
-                        st.error(f"Erro ao gerar decomposição STL: {e}")
-                else:
-                    st.info("Dados insuficientes para decomposição temporal.")
+                    except: pass
             
             with sub_tabs[4]:  # IA
-                st.header("🔍 Análise com Inteligência Artificial")
+                st.subheader("🤖 Assistente de Análise Financeira")
                 
-                if not api_key:
-                    st.warning("⚠️ **Configure a chave de API na página inicial para usar análises com IA.**")
+                if api_key:
+                    st.success(f"Conectado: {ai_provider}")
+                    user_q = st.text_area("Pergunte à IA sobre os dados:", placeholder="Ex: Onde posso reduzir custos?")
+                    if st.button("Enviar Pergunta"):
+                        if user_q:
+                            resumo = df_custos_filtrado.groupby(['tipo_valor', 'mes'])['valor'].sum().reset_index()
+                            msgs = [{"role": "system", "content": "Analista financeiro sênior."}, {"role": "user", "content": f"Dados:\n{resumo.to_string()}\n\nPergunta: {user_q}"}]
+                            resp = get_ai_chat_response(msgs, api_key, ai_provider)
+                            st.markdown(resp)
                 else:
-                    st.success(f"✅ Conectado ao provedor: **{ai_provider}**")
-                
-                st.markdown("---")
-                
-                if st.button("🚀 Gerar Análise Financeira com IA", type="primary"):
-                    if not api_key:
-                        st.error("❌ Configure a chave de API na página inicial.")
-                    else:
-                        with st.spinner("🤖 Analisando dados com IA..."):
-                            contexto = f"""
-                            Centro de Custo: {centro_custo_selecionado}
-                            Conta Contábil: {conta_contabil_selecionada}
-                            Período: {periodo_selecionado}
-                            Total Realizado: R$ {total_realizado:,.2f}
-                            Total Budget: R$ {total_budget:,.2f}
-                            Variação: {variacao:.2f}%
-                            """
-                            analise = gerar_analise_ia(df_custos_filtrado, api_key, ai_provider, contexto)
-                            st.markdown("### 📊 Análise Gerada")
-                            st.markdown(analise)
-                
-                st.markdown("---")
-                st.subheader("💬 Chat com IA sobre seus dados")
-                
-                user_question = st.text_area(
-                    "Faça uma pergunta sobre os dados financeiros:",
-                    placeholder="Ex: Quais são as maiores oportunidades de redução de custos?",
-                    height=100
-                )
-                
-                if st.button("💡 Enviar Pergunta"):
-                    if not api_key:
-                        st.error("❌ Configure a chave de API na página inicial.")
-                    elif not user_question:
-                        st.warning("⚠️ Digite uma pergunta primeiro.")
-                    else:
-                        with st.spinner("🤖 Consultando IA..."):
-                            # Preparar contexto
-                            resumo_dados = df_custos_filtrado.groupby(['tipo_valor', 'mes'])['valor'].sum().reset_index()
-                            
-                            messages = [
-                                {"role": "system", "content": "Você é um analista financeiro sênior especializado em O&M de gasodutos."},
-                                {"role": "user", "content": f"""
-                                Contexto dos dados:
-                                {resumo_dados.to_string()}
-                                
-                                Pergunta do usuário: {user_question}
-                                """}
-                            ]
-                            
-                            resposta = get_ai_chat_response(messages, api_key, ai_provider)
-                            st.markdown("### 💬 Resposta da IA")
-                            st.markdown(resposta)
-        
+                    st.warning("Configure a API Key na Home para usar IA.")
+
         with tab_dre:
-            st.header("📋 Demonstrativo de Resultados (DRE)")
-            
+            st.markdown("### Demonstrativo de Resultados (DRE)")
             if not df_financeiro.empty:
-                ordem_dre = [
-                    "Gross Sales - Basic Services",
-                    "Gross Sales - Eventual Services",
-                    "Sales tax - Basic",
-                    "Sales tax - Eventual",
-                    "Net Revenue",
-                    "Cost of Sales",
-                    "Gross profit",
-                    "Gross margin (%)"
-                ]
-                
-                df_financeiro['conta_contabil'] = pd.Categorical(
-                    df_financeiro['conta_contabil'],
-                    categories=ordem_dre,
-                    ordered=True
-                )
-                df_financeiro = df_financeiro.sort_values('conta_contabil')
-                
-                st.subheader("💰 DRE - Realizados")
-                pivot_dre = df_financeiro.query("tipo_valor == 'Realizado'").pivot_table(
-                    values='valor',
-                    index='conta_contabil',
-                    columns='mes',
-                    aggfunc='sum'
-                ).reindex(columns=MESES_ORDEM).fillna(0)
-                
-                if ultimo_mes_realizado and numero_meses_passados > 0:
-                    pivot_dre['YTD'] = pivot_dre.loc[:, MESES_ORDEM[:numero_meses_passados]].sum(axis=1)
-                
+                ordem_dre = ["Gross Sales - Basic Services", "Gross Sales - Eventual Services", "Sales tax - Basic", "Sales tax - Eventual", "Net Revenue", "Cost of Sales", "Gross profit", "Gross margin (%)"]
+                df_financeiro['conta_contabil'] = pd.Categorical(df_financeiro['conta_contabil'], categories=ordem_dre, ordered=True)
+                pivot_dre = df_financeiro.query("tipo_valor == 'Realizado'").pivot_table(values='valor', index='conta_contabil', columns='mes', aggfunc='sum').reindex(columns=MESES_ORDEM).fillna(0)
                 st.dataframe(pivot_dre.style.format("R$ {:,.2f}"), use_container_width=True)
-                
-                st.divider()
-                
-                st.subheader("📊 DRE - Budget V3")
-                pivot_dre_budget = df_financeiro.query("tipo_valor == 'Budget V3'").pivot_table(
-                    values='valor',
-                    index='conta_contabil',
-                    columns='mes',
-                    aggfunc='sum'
-                ).reindex(columns=MESES_ORDEM).fillna(0)
-                
-                if ultimo_mes_realizado and numero_meses_passados > 0:
-                    pivot_dre_budget['YTD'] = pivot_dre_budget.loc[:, MESES_ORDEM[:numero_meses_passados]].sum(axis=1)
-                
-                st.dataframe(pivot_dre_budget.style.format("R$ {:,.2f}"), use_container_width=True)
-                
-                # Visualização comparativa
-                st.divider()
-                st.subheader("📈 Comparativo DRE: Realizado vs Budget")
-                
-                # Selecionar contas principais
-                contas_principais = ['Net Revenue', 'Cost of Sales', 'Gross profit']
-                df_dre_comp = df_financeiro[df_financeiro['conta_contabil'].isin(contas_principais)]
-                
-                df_dre_comp_group = df_dre_comp.pivot_table(
-                    values='valor',
-                    index='conta_contabil',
-                    columns='tipo_valor',
-                    aggfunc='sum'
-                ).reset_index()
-                
-                if not df_dre_comp_group.empty:
-                    df_dre_melted = df_dre_comp_group.melt(
-                        id_vars='conta_contabil',
-                        var_name='Tipo',
-                        value_name='Valor'
-                    )
-                    
-                    fig_dre = px.bar(
-                        df_dre_melted,
-                        x='conta_contabil',
-                        y='Valor',
-                        color='Tipo',
-                        barmode='group',
-                        title='Comparativo DRE: Principais Contas',
-                        text_auto='.2s'
-                    )
-                    st.plotly_chart(fig_dre, use_container_width=True)
             else:
-                st.info("Dados de DRE não disponíveis.")
+                st.info("Dados de DRE indisponíveis.")
     
     else:
-        st.info("📊 Carregue os dados de P&L na página inicial para visualizar esta análise.")
+        st.info("Carregue o P&L na Home.")
 
 # -----------------------------------------------------------------------------
 # ABA 2: Acompanhamento Orçamentário
 # -----------------------------------------------------------------------------
 
 with tabs[1]:
-    st.header("📊 Acompanhamento Orçamentário")
+    st.markdown('<div class="section-header"><span class="section-title">Acompanhamento Orçamentário</span></div>', unsafe_allow_html=True)
     
     if df_orc_proc is not None and not df_orc_proc.empty:
-        
-        ano_ref = st.session_state.get('processed_orc_year', 2025)
-        st.subheader(f"📅 Análise Orçamentária - Ano {ano_ref}")
-        
         stats = gerar_estatisticas_orcamento(df_orc_proc)
-        
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("💰 Total Previsto", f"R$ {stats['total_previsto']:,.2f}")
-        col2.metric("✅ Total Realizado", f"R$ {stats['total_realizado']:,.2f}")
-        col3.metric("📊 % Execução", f"{stats['percentual_execucao']:.1f}%")
-        col4.metric("⚠️ Desvios Críticos", stats['desvios_criticos'])
+        with col1: exibir_kpi_card("Total Previsto", formatar_valor_brl(stats['total_previsto']), "Budget Global")
+        with col2: exibir_kpi_card("Total Realizado", formatar_valor_brl(stats['total_realizado']), "Executado")
+        with col3: exibir_kpi_card("% Execução", f"{stats['percentual_execucao']:.1f}%", "Real / Prev")
+        with col4: exibir_kpi_card("Desvios Críticos", str(stats['desvios_criticos']), "Alertas > 20%")
         
         st.divider()
-        
-        st.subheader("🗺️ Heatmap de Desvios Orçamentários")
-        st.caption("Visualização de desvios (Realizado - Previsto) por Base Operacional e Mês")
-        
+        st.subheader("🗺️ Heatmap de Desvios (Real vs Previsto)")
         fig_heat = plot_heatmap_desvios(df_orc_proc)
+        fig_heat.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig_heat, use_container_width=True)
         
         st.divider()
+        st.subheader("📋 Evolução por Base Operacional")
+        base_sel = st.selectbox("Base:", ['Todas'] + sorted(df_orc_proc['base_operacional'].unique().tolist()))
+        df_base = df_orc_proc if base_sel == 'Todas' else df_orc_proc[df_orc_proc['base_operacional'] == base_sel]
         
-        st.subheader("📋 Análise Detalhada por Base")
-        
-        base_selecionada = st.selectbox(
-            "Selecione uma Base Operacional:",
-            ['Todas'] + sorted(df_orc_proc['base_operacional'].unique().tolist())
-        )
-        
-        if base_selecionada != 'Todas':
-            df_base = df_orc_proc[df_orc_proc['base_operacional'] == base_selecionada]
-        else:
-            df_base = df_orc_proc
-        
-        # Resumo da base
-        resumo_base = df_base.groupby('mes').agg({
-            'previsto': 'sum',
-            'realizado': 'sum',
-            'diferenca': 'sum'
-        }).reset_index()
-        
+        resumo_base = df_base.groupby('mes').agg({'previsto': 'sum', 'realizado': 'sum'}).reset_index()
         resumo_base['mes'] = pd.Categorical(resumo_base['mes'], categories=MESES_ORDEM, ordered=True)
         resumo_base = resumo_base.sort_values('mes')
         
-        fig_base = px.line(
-            resumo_base,
-            x='mes',
-            y=['previsto', 'realizado'],
-            markers=True,
-            title=f"Evolução Orçamentária - {base_selecionada}",
-            labels={'value': 'Valor (R$)', 'variable': 'Tipo', 'mes': 'Mês'}
-        )
-        st.plotly_chart(fig_base, use_container_width=True)
-        
-        st.dataframe(resumo_base.style.format({
-            'previsto': 'R$ {:,.2f}',
-            'realizado': 'R$ {:,.2f}',
-            'diferenca': 'R$ {:,.2f}'
-        }), use_container_width=True)
-        
-        st.divider()
-        
-        csv_orc = exportar_orcamento_csv(df_orc_proc)
-        st.download_button(
-            "📥 Baixar Orçamento Completo (CSV)",
-            csv_orc,
-            f"orcamento_{ano_ref}.csv",
-            "text/csv",
-            key='download_orc'
-        )
-    
+        fig_evol = px.line(resumo_base, x='mes', y=['previsto', 'realizado'], markers=True, title=f"Evolução - {base_sel}", color_discrete_map={'previsto': CORES['warning'], 'realizado': CORES['primary']})
+        fig_evol.update_layout(template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+        st.plotly_chart(fig_evol, use_container_width=True)
     else:
-        st.info("📊 Carregue os dados de Orçamento na página inicial para visualizar esta análise.")
+        st.info("Carregue o Orçamento na Home.")
 
 # -----------------------------------------------------------------------------
 # ABA 3: Qualidade de Dados
 # -----------------------------------------------------------------------------
 
 with tabs[2]:
-    st.header("🔬 Validação de Qualidade de Dados")
+    st.markdown('<div class="section-header"><span class="section-title">Auditoria e Qualidade</span></div>', unsafe_allow_html=True)
     
-    if df_orc_proc is not None and not df_orc_proc.empty:
+    if df_orc_proc is not None:
         validador = ValidadorDados()
-        
         st.subheader("✅ Validação de Schema (Pandera)")
-        
-        with st.spinner("Validando schema..."):
-            valido, df_val, rel = validador.validar_orcamento(df_orc_proc.copy(), lazy=True)
+        valido, _, rel = validador.validar_orcamento(df_orc_proc.copy(), lazy=True)
         
         if valido:
-            st.success(f"✅ **Schema válido!** {rel['linhas_validas']:,} linhas aprovadas")
+            st.success(f"Dados Validados: {rel['linhas_validas']:,} registros OK.")
         else:
-            st.error(f"❌ **Schema inválido!** {rel['linhas_com_erro']:,} linhas com erros")
-            
-            if rel['erros']:
-                st.subheader("📋 Erros Detectados")
-                df_erros = pd.DataFrame(rel['erros'])
-                st.dataframe(df_erros, use_container_width=True)
+            st.error(f"Falha na Validação: {rel['linhas_com_erro']:,} registros com erro.")
+            if rel['erros']: st.dataframe(pd.DataFrame(rel['erros']), use_container_width=True)
         
         st.divider()
-        
-        st.subheader("📊 Relatório de Qualidade dos Dados")
-        
+        st.subheader("📊 Estatísticas Descritivas")
         rel_q = validador.gerar_relatorio_qualidade(df_orc_proc.copy())
-        
-        st.metric("Total de Linhas", rel_q['total_linhas'])
-        st.metric("Total de Colunas", rel_q['total_colunas'])
-        
-        st.markdown("---")
-        
-        st.subheader("📈 Estatísticas por Coluna")
-        df_stats = pd.DataFrame(rel_q['colunas']).T
-        
-        cols_display = ['tipo', 'valores_nulos', 'percentual_nulos', 'valores_unicos', 'media', 'min', 'max']
-        df_stats_display = df_stats[[c for c in cols_display if c in df_stats.columns]]
-        
-        st.dataframe(df_stats_display, use_container_width=True)
-        
-        # Visualizar nulos
-        st.divider()
-        st.subheader("🔍 Análise de Valores Nulos")
-        
-        df_nulos = df_stats[['valores_nulos', 'percentual_nulos']].sort_values('percentual_nulos', ascending=False).head(10)
-        
-        if not df_nulos.empty and df_nulos['valores_nulos'].sum() > 0:
-            fig_nulos = px.bar(
-                df_nulos.reset_index(),
-                x='index',
-                y='percentual_nulos',
-                title='Top 10 Colunas com Valores Nulos',
-                labels={'index': 'Coluna', 'percentual_nulos': '% Nulos'},
-                text_auto='.2f'
-            )
-            fig_nulos.update_xaxes(tickangle=-45)
-            st.plotly_chart(fig_nulos, use_container_width=True)
-        else:
-            st.success("✅ Nenhum valor nulo detectado!")
-    
-    elif pl_df is not None and not pl_df.empty:
-        st.info("Validação de P&L não implementada nesta versão. Foco em Orçamento.")
-    
-    else:
-        st.info("📊 Carregue os dados de Orçamento na página inicial para validar.")
+        st.dataframe(pd.DataFrame(rel_q['colunas']).T, use_container_width=True)
 
 # -----------------------------------------------------------------------------
-# ABA 4: Previsão Financeira (Modelo Matemático)
+# ABA 4: Previsão Financeira
 # -----------------------------------------------------------------------------
 
 with tabs[3]:
-    st.header("📈 Previsão Financeira")
-    
-    if pl_df is not None and not pl_df.empty:
+    st.markdown('<div class="section-header"><span class="section-title">Forecasting & Projeções</span></div>', unsafe_allow_html=True)
+    if pl_df is not None:
         criar_interface_forecasting_simples()
     else:
-        st.info("📊 Carregue os dados de P&L na página inicial para utilizar o modelo de previsão.")
+        st.info("Necessário P&L carregado para gerar previsões.")
 
 # =============================================================================
 # RODAPÉ
 # =============================================================================
 
 st.markdown("---")
-col_f1, col_f2, col_f3 = st.columns(3)
-
-with col_f1:
-    st.caption("📦 **Versão:** 2.0.1")
-with col_f2:
-    st.caption("📊 **Página:** Análise Financeira")
-with col_f3:
-    st.caption("📅 **Nov 2025**")
+st.markdown(f"""
+<div style="text-align: center; color: {CORES['text_secondary']}; font-size: 12px;">
+    Análise Financeira Avançada • Baseal 2026
+</div>
+""", unsafe_allow_html=True)

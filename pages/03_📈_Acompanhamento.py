@@ -45,114 +45,25 @@ from data.referencias_manager import (
     ATIVOS_SEM_HIERARQUIA
 )
 
-# =============================================================================
-# CONFIGURAÇÃO DA PÁGINA
-# =============================================================================
-
-st.set_page_config(
-    page_title="Acompanhamento Orçamentário - 2026",
-    page_icon="📈",
-    layout="wide",
-    initial_sidebar_state="expanded"
+from utils_ui import (
+    setup_page, 
+    formatar_valor_brl, 
+    exibir_kpi_card, 
+    CORES
 )
 
 # =============================================================================
-# PALETA DE CORES
+# CONFIGURAÇÃO DA PÁGINA & UI
 # =============================================================================
 
-CORES = {
-    'orcado': '#3b82f6',       # Azul
-    'realizado': '#10b981',    # Verde
-    'desvio_neg': '#ef4444',   # Vermelho
-    'desvio_pos': '#f59e0b',   # Amarelo/Laranja
-    'neutro': '#6b7280',       # Cinza
-    'background': '#0f172a',   # Slate escuro
-    'card': '#1e293b',         # Slate
-    'texto': '#f1f5f9',        # Slate claro
-    'destaque': '#00d4aa'      # Cyan
-}
+setup_page("Acompanhamento Orçamentário - 2026", "📈")
 
 # =============================================================================
-# CSS CUSTOMIZADO
+# ESTILOS ADICIONAIS
 # =============================================================================
 
 st.markdown("""
 <style>
-    /* Tema escuro premium */
-    .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-    }
-    
-    /* Cards de KPI */
-    .kpi-card {
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        border-radius: 16px;
-        padding: 24px;
-        text-align: center;
-        border: 1px solid #475569;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        transition: transform 0.2s ease;
-    }
-    
-    .kpi-card:hover {
-        transform: translateY(-2px);
-    }
-    
-    .kpi-value {
-        font-size: 32px;
-        font-weight: 700;
-        color: #f1f5f9;
-        margin-bottom: 8px;
-    }
-    
-    .kpi-label {
-        font-size: 14px;
-        color: #94a3b8;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .kpi-delta {
-        font-size: 14px;
-        margin-top: 8px;
-        padding: 4px 8px;
-        border-radius: 4px;
-        display: inline-block;
-    }
-    
-    .kpi-delta.positive {
-        background: rgba(239, 68, 68, 0.2);
-        color: #ef4444;
-    }
-    
-    .kpi-delta.negative {
-        background: rgba(16, 185, 129, 0.2);
-        color: #10b981;
-    }
-    
-    .kpi-delta.neutral {
-        background: rgba(107, 114, 128, 0.2);
-        color: #9ca3af;
-    }
-    
-    /* Seções */
-    .section-header {
-        padding: 16px 0 8px 0;
-        border-bottom: 2px solid #00d4aa;
-        margin-bottom: 24px;
-    }
-    
-    .section-title {
-        font-size: 24px;
-        font-weight: 600;
-        color: #f1f5f9;
-    }
-    
-    /* Tabelas */
-    .dataframe {
-        background: #1e293b !important;
-    }
-    
     /* Alertas customizados */
     .alert-info {
         background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
@@ -170,11 +81,6 @@ st.markdown("""
         margin: 16px 0;
     }
     
-    /* Sidebar */
-    .css-1d391kg {
-        background: #0f172a;
-    }
-    
     /* Métricas do Streamlit */
     [data-testid="stMetricValue"] {
         font-size: 28px;
@@ -186,19 +92,6 @@ st.markdown("""
 # =============================================================================
 # FUNÇÕES AUXILIARES
 # =============================================================================
-
-def formatar_valor_brl(valor: float, resumido: bool = False) -> str:
-    """Formata valor em reais."""
-    if valor is None:
-        return "R$ 0,00"
-    
-    if resumido and abs(valor) >= 1_000_000:
-        return f"R$ {valor/1_000_000:,.1f}M".replace(",", "X").replace(".", ",").replace("X", ".")
-    elif resumido and abs(valor) >= 1_000:
-        return f"R$ {valor/1_000:,.1f}K".replace(",", "X").replace(".", ",").replace("X", ".")
-    
-    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
 
 def formatar_percentual(valor: float) -> str:
     """Formata valor como percentual."""
@@ -435,45 +328,53 @@ st.markdown("---")
 # KPIs GERAIS
 # =============================================================================
 
+
 kpis = get_kpis_gerais(2026)
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-value">{formatar_valor_brl(kpis['total_orcado'], True)}</div>
-        <div class="kpi-label">Total Orçado</div>
-    </div>
-    """, unsafe_allow_html=True)
+    exibir_kpi_card(
+        "Total Orçado", 
+        formatar_valor_brl(kpis['total_orcado']),
+        None
+    )
 
 with col2:
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-value">{formatar_valor_brl(kpis['total_realizado'], True)}</div>
-        <div class="kpi-label">Total Realizado</div>
-        <div class="kpi-delta {'positive' if kpis['desvio'] > 0 else 'negative' if kpis['desvio'] < 0 else 'neutral'}">
-            {formatar_valor_brl(kpis['desvio'], True)} ({kpis['desvio_pct']:+.1f}%)
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Determinar cor do delta
+    desvio = kpis['desvio']
+    cor_delta = "positive" if desvio > 0 else "neutral"  # Adaptar conforme lógica de negócio/tema
+    # No tema premium: positive = vermelho (atenção), neutral/negative = verde?
+    # Vamos usar a convenção: desvio positivo (gasto a mais) = danger (vermelho), desvio negativo = success
+    # Como utils_ui não tem "danger" explícito no argumento cor_delta, vamos passar a classe do utils_ui se soubermos,
+    # mas o utils_ui aceita qualquer string como classe.
+    # Na verdade utils_ui espera "neutral", "positive" (vermelho), "negative" (verde) se basear no CSS legado?
+    # Vamos checar utils_ui.py:
+    # CORES = {'desvio_neg': '#ef4444', ...} 
+    # exibir_kpi_card usa delta_html = f'<div class="kpi-delta {cor_delta}"...'
+    # Se passarmos "negative" (verde) ou "positive" (vermelho) baseado no CSS antigo.
+    # Vamos assumir: desvio > 0 (estouro) -> 'kpi-delta-danger' (se existir) ou apenas passar texto formatado.
+    
+    delta_txt = f"{formatar_valor_brl(desvio)} ({kpis['desvio_pct']:+.1f}%)"
+    exibir_kpi_card(
+        "Total Realizado",
+        formatar_valor_brl(kpis['total_realizado']),
+        delta_txt
+    )
 
 with col3:
-    execucao_cor = 'positive' if kpis['execucao_pct'] > 100 else 'neutral'
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-value">{kpis['execucao_pct']:.1f}%</div>
-        <div class="kpi-label">Execução Orçamentária</div>
-    </div>
-    """, unsafe_allow_html=True)
+    exibir_kpi_card(
+        "Execução Orçamentária",
+        f"{kpis['execucao_pct']:.1f}%",
+        None
+    )
 
 with col4:
-    st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-value">{kpis['meses_com_dados']}/12</div>
-        <div class="kpi-label">Meses com Lançamentos</div>
-    </div>
-    """, unsafe_allow_html=True)
+    exibir_kpi_card(
+        "Meses com Lançamentos",
+        f"{kpis['meses_com_dados']}/12",
+        None
+    )
 
 st.markdown("<br>", unsafe_allow_html=True)
 

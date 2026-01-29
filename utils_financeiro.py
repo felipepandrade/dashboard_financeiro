@@ -790,7 +790,14 @@ def get_ai_chat_response(messages: List[Dict], api_key: str, provider: str) -> s
     try:
         if "Gemini" in provider:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-pro')
+            
+            # Selecionar modelo (Padrão 3 Pro, fallback para 3 Flash se solicitado)
+            model_name = 'gemini-3-pro-preview'
+            if 'Flash' in provider:
+                model_name = 'gemini-3-flash-preview'
+            
+            # print(f"[DEBUG] Usando Modelo: {model_name}")
+            model = genai.GenerativeModel(model_name)
             
             # Concatenar mensagens
             prompt = "\n".join([msg["content"] for msg in messages if msg["role"] == "user"])
@@ -1251,4 +1258,71 @@ def criar_interface_forecasting_simples():
             file_name=f"previsoes_{method}_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv"
         )
+
+
+# =============================================================================
+# 10. INTEGRAÇÃO COM NOVA UI (HOME REFACTORED)
+# =============================================================================
+
+def verificar_status_dados() -> Dict:
+    """Verifica status dos dados no session_state."""
+    status = {
+        'orcamento_ok': False,
+        'orcamento_linhas': 0,
+        'pl_ok': False,
+        'pl_data': None,
+        'mes_atual': datetime.now().strftime('%b/%Y').upper()
+    }
+    
+    # Orçamento (Tenta carregar se não existir)
+    if 'df_orc_proc' not in st.session_state:
+        try:
+            # Tentar carga automática default (opcional)
+            pass
+        except:
+            pass
+
+    if 'df_orc_proc' in st.session_state and not st.session_state['df_orc_proc'].empty:
+        status['orcamento_ok'] = True
+        status['orcamento_linhas'] = len(st.session_state['df_orc_proc'])
+        
+    if 'pl_df' in st.session_state and not st.session_state['pl_df'].empty:
+        status['pl_ok'] = True
+        try:
+            max_date = st.session_state['pl_df']['data'].max()
+            status['pl_data'] = max_date.strftime('%d/%m/%Y')
+        except:
+            status['pl_data'] = "Data Desconhecida"
+            
+    return status
+
+def processar_upload_pl(uploaded_file) -> Tuple[bool, str, Dict]:
+    """Wrapper para processar upload de P&L com validação."""
+    if not uploaded_file:
+        return False, "Nenhum arquivo enviado", {}
+        
+    # Usar a função existente de processamento
+    try:
+        df = processar_pl_baseal(uploaded_file)
+        
+        if not df.empty:
+            st.session_state['pl_df'] = df
+            
+            # Gerar resumo
+            resumo = {
+                'total_registros': len(df),
+                'meses': df['mes'].unique().tolist(),
+                'total_realizado': f"R$ {df[df['tipo_valor']=='Realizado']['valor'].sum():,.2f}"
+            }
+            st.session_state['pl_resumo_importacao'] = resumo
+            
+            return True, "Processamento concluído com sucesso", resumo
+        else:
+            return False, "Falha ao processar arquivo. Verifique o formato.", {}
+    except Exception as e:
+        return False, f"Erro ao processar: {e}", {}
+
+def get_resumo_importacao():
+    """Retorna resumo da última importação."""
+    return st.session_state.get('pl_resumo_importacao', {})
 

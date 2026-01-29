@@ -1,159 +1,81 @@
-"""
-05_🧱_Controle_Orcamentario.py
-==============================
-Módulo de Controle Orçamentário (Features B, D, E).
-Gestão de Provisões, Remanejamentos e Justificativas (OBZ).
-"""
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from services.provisioning_service import ProvisioningService
 from services.budget_control import BudgetControlService
-from data.referencias_manager import carregar_centros_gasto
-from database.models import get_session, LancamentoRealizado
-from utils_financeiro import MESES_ORDEM
+from data.referencias_manager import carregar_centros_gasto, MESES_ORDEM
+from utils_ui import setup_page, formatar_valor_brl
 
-st.set_page_config(
-    page_title="Controle Orçamentário",
-    page_icon="🧱",
-    layout="wide"
-)
+# =============================================================================
+# CONFIGURAÇÃO
+# =============================================================================
 
-st.title("🧱 Controle e Governança Orçamentária")
+setup_page("Controle Orçamentário", "🧱")
+
+st.markdown("""
+<div style="text-align: center; padding: 20px 0;">
+    <h1 style="color: #f1f5f9; font-size: 36px; margin-bottom: 8px;">
+        🧱 Governança Orçamentária
+    </h1>
+    <p style="color: #94a3b8; font-size: 16px;">
+        Gestão de Remanejamentos (Transposições) e Justificativas de Base Zero
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown("---")
 
 # Serviços
-prov_service = ProvisioningService()
-budget_service = BudgetControlService()
-
-# Carregar Referências
-df_centros = carregar_centros_gasto()
-lista_centros = df_centros['codigo'].unique().tolist() if not df_centros.empty else []
-lista_centros_fmt = [f"{c} - {df_centros[df_centros['codigo']==c]['descricao'].iloc[0]}" for c in lista_centros]
-map_centro_desc = {c: desc for c, desc in zip(lista_centros, lista_centros_fmt)}
-
-tabs = st.tabs(["📋 Gestão de Provisões (Feature B)", "🔄 Remanejamentos (Feature D)", "🛡️ Justificativa OBZ (Feature E)"])
-
-# =============================================================================
-# ABA 1: GESTÃO DE PROVISÕES (FEATURE B)
-# =============================================================================
-with tabs[0]:
-    st.header("Gestão de Provisões e Passivos (IAS 37)")
-    st.caption("Registre despesas estimadas (obrigações presentes) e concilie quando realizadas.")
+try:
+    budget_service = BudgetControlService()
+    df_centros = carregar_centros_gasto()
     
-    col_form, col_list = st.columns([1, 3])
-    
-    with col_form:
-        st.subheader("Nova Provisão")
-        with st.form("form_provisao"):
-            desc_prov = st.text_input("Descrição da Obrigação")
-            valor_prov = st.number_input("Valor Estimado (R$)", min_value=0.0, format="%.2f")
-            centro_prov = st.selectbox("Centro de Custo", lista_centros, format_func=lambda x: map_centro_desc.get(x, x))
-            conta_prov = st.text_input("Conta Contábil (Código)") # Ideal seria dropdown
-            mes_prov = st.selectbox("Mês Competência", MESES_ORDEM)
-            tipo_despesa = st.selectbox("Tipo", ["Variavel", "Fixa", "Emergencial"])
-            justif_prov = st.text_area("Justificativa")
-            
-            if st.form_submit_button("Registrar Provisão"):
-                try:
-                    prov_service.criar_provisao({
-                        "descricao": desc_prov,
-                        "valor_estimado": valor_prov,
-                        "centro_gasto_codigo": centro_prov,
-                        "conta_contabil_codigo": conta_prov,
-                        "mes_competencia": mes_prov,
-                        "tipo_despesa": tipo_despesa,
-                        "justificativa_obz": justif_prov,
-                        "usuario": "UsuarioAtual" # Mock
-                    })
-                    st.success("Provisão registrada!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e}")
-
-    with col_list:
-        st.subheader("Provisões Ativas")
-        
-        filtro_status = st.selectbox("Status", ["TODOS", "PENDENTE", "REALIZADA", "CANCELADA"], index=1)
-        
-        lista_prov = prov_service.listar_provisoes(status=None if filtro_status=="TODOS" else filtro_status)
-        
-        if lista_prov:
-            df_prov = pd.DataFrame(lista_prov)
-            st.dataframe(
-                df_prov[['id', 'descricao', 'valor_estimado', 'mes_competencia', 'status', 'centro_gasto_codigo']],
-                use_container_width=True
-            )
-            
-            # Ação de Conciliação
-            st.divider()
-            col_conciliacao, col_cancel = st.columns(2)
-            
-            with col_conciliacao:
-                st.markdown("#### 🔗 Conciliar Provisão")
-                prov_id_sel = st.selectbox("Selecione ID para Conciliar", [p['id'] for p in lista_prov if p['status']=='PENDENTE'])
-                
-                if prov_id_sel:
-                    # Buscar lançamentos candidatos (mesmo mês e centro)
-                    prov_selecionada = next(p for p in lista_prov if p['id'] == prov_id_sel)
-                    
-                    # Buscar no banco (query simples)
-                    session = get_session()
-                    candidatos = session.query(LancamentoRealizado).filter(
-                        LancamentoRealizado.mes == prov_selecionada['mes_competencia'],
-                        LancamentoRealizado.centro_gasto_codigo == prov_selecionada['centro_gasto_codigo']
-                    ).all()
-                    session.close()
-                    
-                    opcoes_lanc = [f"{l.id} | R$ {l.valor} | {l.fornecedor}" for l in candidatos]
-                    lanc_sel_str = st.selectbox("Vincular ao Lançamento Recente:", ["Selecione..."] + opcoes_lanc)
-                    
-                    if st.button("Confirmar Conciliação") and lanc_sel_str != "Selecione...":
-                        lanc_id = int(lanc_sel_str.split('|')[0].strip())
-                        try:
-                            prov_service.conciliar_provisao(prov_id_sel, lanc_id)
-                            st.success(f"Provisão {prov_id_sel} conciliada com sucesso!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro: {e}")
-
-            with col_cancel:
-                st.markdown("#### 🗑️ Reverter/Cancelar")
-                prov_id_cancel = st.selectbox("Selecione ID para Cancelar", [p['id'] for p in lista_prov if p['status']=='PENDENTE'], key='cancel_sel')
-                motivo_cancel = st.text_input("Motivo do Cancelamento")
-                
-                if st.button("Cancelar Provisão"):
-                    if motivo_cancel:
-                        prov_service.cancelar_provisao(prov_id_cancel, motivo_cancel)
-                        st.success("Cancelado.")
-                        st.rerun()
-                    else:
-                        st.warning("Informe o motivo.")
-        else:
-            st.info("Nenhuma provisão encontrada.")
+    # Preparar listas para dropdowns
+    lista_centros = []
+    map_centro_desc = {}
+    if not df_centros.empty:
+        lista_centros = df_centros['codigo'].unique().tolist()
+        for idx, row in df_centros.iterrows():
+             map_centro_desc[row['codigo']] = f"{row['codigo']} - {row['descricao']}"
+except Exception as e:
+    st.error(f"Erro ao inicializar serviços: {e}")
+    st.stop()
 
 # =============================================================================
-# ABA 2: REMANEJAMENTOS (FEATURE D)
+# TABS
 # =============================================================================
-with tabs[1]:
-    st.header("Remanejamento Orçamentário")
-    st.caption("Solicite e aprove transferências de saldo entre centros de custo.")
+
+tab_remanejamento, tab_obz = st.tabs(["🔄 Solicitar Remanejamento", "🛡️ Justificativa OBZ"])
+
+# =============================================================================
+# ABA 1: REMANEJAMENTOS (FEATURE D)
+# =============================================================================
+with tab_remanejamento:
+    st.markdown('<div class="section-header"><span class="section-title">Transferências de Saldo</span></div>', unsafe_allow_html=True)
     
     col_req, col_hist = st.columns([1, 2])
     
     with col_req:
-        st.subheader("Solicitar Transferência")
-        with st.form("form_remanejamento"):
-            origem = st.selectbox("Centro Origem", lista_centros, format_func=lambda x: map_centro_desc.get(x, x), key='orig')
-            destino = st.selectbox("Centro Destino", lista_centros, format_func=lambda x: map_centro_desc.get(x, x), key='dest')
-            valor_transf = st.number_input("Valor (R$)", min_value=0.0)
-            mes_transf = st.selectbox("Mês Referência", MESES_ORDEM, key='mes_transf')
-            justif_transf = st.text_area("Justificativa Econômica")
+        st.markdown("#### 📝 Nova Solicitação")
+        st.info("Utilize para transferir saldo disponível entre centros de custo.")
+        
+        with st.form("form_remanejamento", clear_on_submit=True):
+            origem = st.selectbox("Centro Origem (De)", lista_centros, format_func=lambda x: map_centro_desc.get(x, x), key='orig')
+            destino = st.selectbox("Centro Destino (Para)", lista_centros, format_func=lambda x: map_centro_desc.get(x, x), key='dest')
             
-            if st.form_submit_button("Solicitar Aprovação"):
+            valor_transf = st.number_input("Valor (R$)", min_value=0.0, step=1000.0, format="%.2f")
+            mes_transf = st.selectbox("Mês de Referência", MESES_ORDEM, key='mes_transf')
+            
+            justif_transf = st.text_area("Justificativa Técnica/Econômica", placeholder="Motivo da transferência...")
+            
+            submitted = st.form_submit_button("🚀 Enviar Solicitação", type="primary", use_container_width=True)
+            
+            if submitted:
                 if origem == destino:
-                    st.error("Origem e Destino devem ser diferentes.")
+                    st.error("❌ Origem e Destino devem ser diferentes.")
+                elif valor_transf <= 0:
+                    st.error("❌ Valor deve ser maior que zero.")
+                elif not justif_transf:
+                    st.error("❌ Justificativa obrigatória.")
                 else:
                     try:
                         budget_service.solicitar_remanejamento({
@@ -162,62 +84,103 @@ with tabs[1]:
                             "valor": valor_transf,
                             "mes": mes_transf,
                             "justificativa": justif_transf,
-                            "solicitante": "UsuarioAtual"
+                            "solicitante": "UsuarioAtual" # Implementar auth real futuramente
                         })
-                        st.success("Solicitação enviada para workflow!")
-                        st.rerun()
+                        st.success("✅ Solicitação enviada para aprovação!")
+                        st.balloons()
                     except Exception as e:
-                        st.error(f"Erro: {e}")
+                        st.error(f"Erro ao processar: {e}")
 
     with col_hist:
-        st.subheader("Histórico de Solicitações")
+        st.markdown("#### 📜 Histórico & Aprovações")
         reqs = budget_service.listar_remanejamentos()
         
         if reqs:
             df_reqs = pd.DataFrame(reqs)
             
-            # Workflow Mock
-            st.dataframe(df_reqs[['id', 'origem', 'destino', 'valor', 'status', 'justificativa']], use_container_width=True)
+            # Formatar para exibição
+            df_reqs['Valor'] = df_reqs['valor'].apply(formatar_valor_brl)
             
-            st.markdown("#### 👮 Área de Aprovação")
+            st.dataframe(
+                df_reqs[['id', 'origem', 'destino', 'Valor', 'status', 'justificativa']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "id": st.column_config.NumberColumn("#", width="small"),
+                    "origem": "Origem",
+                    "destino": "Destino",
+                    "Valor": "Valor",
+                    "status": st.column_config.TextColumn("Status", width="small"),
+                    "justificativa": "Justificativa"
+                }
+            )
+            
+            # Área de Aprovação (Simulação de Admin)
+            st.markdown("---")
+            st.markdown("#### 👮 Painel do Aprovador")
+            
             pendentes = [r for r in reqs if r['status'] == 'SOLICITADO']
             
             if pendentes:
-                req_aprovar = st.selectbox("Selecione Solicitação Pendente", [f"{r['id']} - R$ {r['valor']} ({r['origem']}->{r['destino']})" for r in pendentes])
-                id_aprov = int(req_aprovar.split('-')[0].strip())
+                col_aprov1, col_aprov2 = st.columns([2, 1])
                 
-                col_yes, col_no = st.columns(2)
-                if col_yes.button("✅ APROVAR"):
-                    budget_service.aprovar_remanejamento(id_aprov, "Admin")
-                    st.balloons()
-                    st.rerun()
+                with col_aprov1:
+                    req_aprovar = st.selectbox(
+                        "Selecione Solicitação Pendente", 
+                        [f"{r['id']} - {formatar_valor_brl(r['valor'])} ({r['origem']} -> {r['destino']})" for r in pendentes]
+                    )
                 
-                if col_no.button("❌ REJEITAR"):
-                    budget_service.rejeitar_remanejamento(id_aprov, "Admin (Motivo Genérico)")
-                    st.rerun()
+                if req_aprovar:
+                    id_aprov = int(req_aprovar.split(' - ')[0])
+                    
+                    with col_aprov2:
+                        st.markdown("<br>", unsafe_allow_html=True) # Espaçamento
+                        col_y, col_n = st.columns(2)
+                        if col_y.button("✅ Aprovar", use_container_width=True):
+                            budget_service.aprovar_remanejamento(id_aprov, "Admin")
+                            st.success(f"Solicitação {id_aprov} aprovada!")
+                            st.rerun()
+                        
+                        if col_n.button("❌ Rejeitar", use_container_width=True):
+                            budget_service.rejeitar_remanejamento(id_aprov, "Rejeitado pelo Admin")
+                            st.rerun()
             else:
-                st.success("Nenhuma solicitação pendente.")
+                st.success("✅ Nenhuma solicitação pendente de análise.")
         else:
-            st.info("Nenhum histórico.")
+            st.info("📭 Nenhum histórico de remanejamentos encontrado.")
 
 # =============================================================================
-# ABA 3: JUSTIFICATIVA OBZ (FEATURE E)
+# ABA 2: JUSTIFICATIVA OBZ (FEATURE E)
 # =============================================================================
-with tabs[2]:
-    st.header("Justificativa Base Zero (OBZ Light)")
-    st.markdown("""
-    Nesta visualização, analise os gastos históricos e classifique-os por essencialidade. 
-    O objetivo é eliminar desperdícios e garantir que cada centavo gere valor.
-    """)
+with tab_obz:
+    st.markdown('<div class="section-header"><span class="section-title">Justificativa Base Zero (OBZ)</span></div>', unsafe_allow_html=True)
     
-    st.info("🚧 Em construção: Esta funcionalidade será integrada aos dados de P&L históricos na próxima iteração.")
+    col_obz1, col_obz2 = st.columns([1, 1])
     
-    # Mock visual
-    st.subheader("Matriz de Essencialidade")
+    with col_obz1:
+        st.markdown("""
+        <div style="background-color: #1e293b; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+            <h4 style="color: #f59e0b; margin-top: 0;">🎯 Metodologia OBZ</h4>
+            <p>Nesta seção, você deve justificar a necessidade e essencialidade de pacotes de gastos específicos, 
+            classificando-os conforme sua criticidade para a operação.</p>
+            <p>O objetivo é eliminar desperdícios e garantir alocação eficiente de recursos.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_obz2:
+        st.info("🚧 Funcionalidade em desenvolvimento para a Fase 2 (Integração com P&L Histórico).")
+
+    # Mock Visual
+    st.markdown("#### Prévia da Matriz de Essencialidade")
+    
     df_mock = pd.DataFrame({
-        "Pacote": ["Viagens", "Treinamento", "Software", "Eventos"],
-        "Valor Orçado (Base Histórica)": [50000, 20000, 15000, 10000], 
-        "Justificativa": ["Necessário visita técnica", "Upskilling equipe", "Licença obrigatória", "Team building"],
-        "Score Essencialidade": ["Alto", "Médio", "Crítico", "Baixo"]
+        "Pacote de Gastos": ["Viagens Corporativas", "Treinamento Técnico", "Licenças de Software", "Confraternizações"],
+        "Valor Orçado 2026": [50000, 20000, 15000, 10000],
+        "Classificação OBZ": ["Necessário / Não Crítico", "Estratégico / Crítico", "Obrigatório / Legal", "Desejável"],
+        "Ação Recomendada": ["Reduzir 20%", "Manter", "Renegociar", "Cortar"]
     })
+    
+    df_mock['Valor Orçado 2026'] = df_mock['Valor Orçado 2026'].apply(formatar_valor_brl)
+    
     st.dataframe(df_mock, use_container_width=True)
+

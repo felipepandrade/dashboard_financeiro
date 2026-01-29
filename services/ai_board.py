@@ -67,7 +67,15 @@ class AIBoard:
         # Simula uma chamada isolada para essa persona
         # Em produção, isso poderia ser chamadas paralelas
         messages = [{"role": "user", "content": full_prompt}]
-        return get_ai_chat_response(messages, self.api_key, self.provider)
+        
+        # Estrategia Hibrida de Modelos (Gemini 3 Pro vs Flash)
+        provider_for_call = self.provider
+        
+        # Personas operacionais usam Flash (mais rapido/eficiente)
+        if persona in ["Controller", "Analyst"] and "Gemini" in self.provider:
+            provider_for_call = self.provider + " Flash"
+            
+        return get_ai_chat_response(messages, self.api_key, provider_for_call)
 
     def realizar_reuniao_board(self, user_query: str) -> Dict[str, str]:
         """
