@@ -185,3 +185,128 @@ class LancamentoRealizado(Base):
             observacoes=data.get('observacoes', '')
         )
 
+
+# =============================================================================
+# NOVOS MODELOS (FASES 5-7)
+# =============================================================================
+
+class ForecastCenario(Base):
+    """
+    Representa um cenário de previsão (Fase 5 - Feature A).
+    Ex: 'Cenário Otimista Jan/26', 'Forecast Automático V1'
+    """
+    __tablename__ = 'forecast_cenarios'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nome = Column(String(100), nullable=False)
+    descricao = Column(String(200))
+    tipo = Column(String(20), default='AUTOMATICO')  # AUTOMATICO, MANUAL
+    data_criacao = Column(DateTime, default=datetime.now)
+    usuario_criador = Column(String(100))
+    ano_referencia = Column(Integer, default=2026)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'nome': self.nome,
+            'descricao': self.descricao,
+            'tipo': self.tipo,
+            'data_criacao': self.data_criacao.isoformat(),
+            'usuario_criador': self.usuario_criador
+        }
+
+class ForecastEntry(Base):
+    """
+    Entradas individuais de previsão vinculadas a um cenário.
+    """
+    __tablename__ = 'forecast_entries'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cenario_id = Column(Integer, nullable=False, index=True) # FK lógica
+    mes = Column(String(3), nullable=False, index=True)
+    centro_gasto_codigo = Column(String(11), nullable=False, index=True)
+    conta_contabil_codigo = Column(String(15), nullable=False)
+    valor_previsto = Column(Float, nullable=False)
+    metodo_calculo = Column(String(50)) # linear, media_movel, manual
+    
+    __table_args__ = (
+        Index('idx_forecast_cenario_mes', 'cenario_id', 'mes'),
+    )
+
+class Provisao(Base):
+    """
+    Gestão de provisões e passivos (Fase 6 - Feature B).
+    """
+    __tablename__ = 'provisoes'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    descricao = Column(String(200), nullable=False)
+    valor_estimado = Column(Float, nullable=False)
+    centro_gasto_codigo = Column(String(11), nullable=False, index=True)
+    conta_contabil_codigo = Column(String(15), nullable=False)
+    mes_competencia = Column(String(3), nullable=False) # Mês a que se refere
+    
+    # Ciclo de vida: PENDENTE -> REALIZADA (Consumida) -> CANCELADA (Revertida)
+    status = Column(String(20), default='PENDENTE', index=True) 
+    
+    # Justificativa Base Zero (Feature E)
+    justificativa_obz = Column(Text)
+    tipo_despesa = Column(String(20), default='Variavel') # Core, Nice-to-have, etc.
+    
+    # Vínculo com lançamento real (quando a provisão se concretiza)
+    lancamento_realizado_id = Column(Integer, nullable=True) # FK lógica
+    
+    data_criacao = Column(DateTime, default=datetime.now)
+    data_atualizacao = Column(DateTime, onupdate=datetime.now)
+    usuario = Column(String(100))
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'descricao': self.descricao,
+            'valor_estimado': self.valor_estimado,
+            'centro_gasto_codigo': self.centro_gasto_codigo,
+            'conta_contabil_codigo': self.conta_contabil_codigo,
+            'mes_competencia': self.mes_competencia,
+            'status': self.status,
+            'justificativa_obz': self.justificativa_obz
+        }
+
+class Remanejamento(Base):
+    """
+    Transferências de orçamento entre centros (Fase 7 - Feature D).
+    """
+    __tablename__ = 'remanejamentos'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Origem
+    centro_origem_codigo = Column(String(11), nullable=False)
+    conta_origem_codigo = Column(String(15)) # Opcional se for remanejamento global do centro
+    
+    # Destino
+    centro_destino_codigo = Column(String(11), nullable=False)
+    conta_destino_codigo = Column(String(15))
+    
+    valor = Column(Float, nullable=False)
+    mes = Column(String(3), nullable=False)
+    
+    justificativa = Column(Text, nullable=False)
+    
+    # Workflow
+    status = Column(String(20), default='SOLICITADO') # SOLICITADO, APROVADO, REJEITADO
+    solicitante = Column(String(100))
+    aprovador = Column(String(100))
+    data_aprovacao = Column(DateTime)
+    
+    data_solicitacao = Column(DateTime, default=datetime.now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'origem': self.centro_origem_codigo,
+            'destino': self.centro_destino_codigo,
+            'valor': self.valor,
+            'status': self.status,
+            'justificativa': self.justificativa
+        }
