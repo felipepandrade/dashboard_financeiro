@@ -21,10 +21,10 @@ setup_page("Home - Baseal Planejamento", "🏠")
 st.markdown("""
 <div style="text-align: center; padding: 40px 0;">
     <h1 style="color: #f1f5f9; font-size: 42px; font-weight: 800; margin-bottom: 12px;">
-        🚀 Dashboard Financeiro 2026
+        Sistema de Gestão Financeira
     </h1>
     <p style="color: #94a3b8; font-size: 18px; max_width: 600px; margin: 0 auto;">
-        Sistema integrado de planejamento, controle orçamentário e acompanhamento de resultados.
+        Central de Inteligência para Tomada de Decisão • Baseal 2026
     </p>
 </div>
 """, unsafe_allow_html=True)

@@ -94,6 +94,17 @@ def aplicar_estilo_premium():
         .css-1d391kg {
             background: #0f172a;
         }
+
+        /* Centralizar Logo (st.logo) */
+        [data-testid="stLogo"] {
+            width: 100%;
+            justify-content: center;
+            display: flex;
+        }
+        [data-testid="stLogo"] img {
+            max-width: 200px !important; /* Forçar tamanho se necessário */
+            width: 200px !important;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -108,11 +119,18 @@ def setup_page(title: str, icon: str = "📊", layout: str = "wide"):
     aplicar_estilo_premium()
     
     # -------------------------------------------------------------------------
+    # LOGO (Header)
+    # -------------------------------------------------------------------------
+    try:
+        st.logo("logo_engie.png", icon_image="logo_engie.png")
+    except:
+        # Fallback se imagem não existir
+        st.logo("https://img.icons8.com/color/48/data-configuration.png")
+    
+    # -------------------------------------------------------------------------
     # SIDEBAR GLOBAL (Configurações)
     # -------------------------------------------------------------------------
     with st.sidebar:
-        st.logo("https://img.icons8.com/color/48/data-configuration.png" , icon_image="https://img.icons8.com/color/48/data-configuration.png") # Placeholder ou use local se tiver
-        
         st.markdown("### ⚙️ Configurações do Sistema")
         
         # Gestão de Chaves de API (Centralizada)
