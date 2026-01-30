@@ -12,3 +12,6 @@ scikit-learn
 sqlalchemy
 watchdog
 altair
+playwright
+nest_asyncio
+requests

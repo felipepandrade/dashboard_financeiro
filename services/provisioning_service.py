@@ -74,6 +74,50 @@ class ProvisioningService:
         finally:
             session.close()
 
+    def criar_provisoes_em_lote(self, lista_dados: List[dict]) -> Tuple[int, List[str]]:
+        """
+        Cria múltiplas provisões em uma única transação.
+        Retorna (sucesso_count, erros_list).
+        """
+        session = get_session()
+        sucesso_count = 0
+        erros = []
+        
+        try:
+            for idx, dados in enumerate(lista_dados):
+                try:
+                    # Compilar descrição com fornecedor se existir
+                    desc = dados.get('descricao')
+                    fornecedor = dados.get('fornecedor')
+                    if fornecedor:
+                        desc = f"{desc} ({fornecedor})"
+                        
+                    nova = Provisao(
+                        descricao=desc,
+                        valor_estimado=float(dados['valor_estimado']),
+                        centro_gasto_codigo=str(dados['centro_gasto_codigo']),
+                        conta_contabil_codigo=str(dados['conta_contabil_codigo']),
+                        mes_competencia=dados['mes_competencia'],
+                        justificativa_obz=dados.get('justificativa_obz'),
+                        tipo_despesa=dados.get('tipo_despesa', 'Variavel'),
+                        usuario=dados.get('usuario', 'Importação em Lote')
+                    )
+                    session.add(nova)
+                    sucesso_count += 1
+                except Exception as e:
+                    erros.append(f"Linha {idx+2}: {str(e)}") # +2 considerando header e 0-index
+            
+            if sucesso_count > 0:
+                session.commit()
+                
+            return sucesso_count, erros
+            
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
     def cancelar_provisao(self, provisao_id: int, motivo: str) -> bool:
         """Cancela (reverte) uma provisão."""
         session = get_session()

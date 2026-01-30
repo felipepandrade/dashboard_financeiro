@@ -62,6 +62,13 @@
 - [x] Implementar suporte a múltiplos anos (2024, 2025) no upload de P&L
 - [x] Adicionar filtro de anos na visualização de histórico
 
+## 📥 Fase 8.2: Importação em Lote de Provisões (Novo Requisito)
+
+- [x] Criar método `criar_provisoes_em_lote` em `ProvisioningService`
+- [x] Criar gerador de template (Excel/CSV) para download
+- [x] Implementar aba "Importação em Lote" na página `02_📝_Lancamentos.py`
+- [x] Implementar lógica de leitura e validação do arquivo de importação
+
 ## 📊 Fase 8: Consolidação e Histórico
 
 - [x] Processar P&L Dez/2025 para histórico comparativo

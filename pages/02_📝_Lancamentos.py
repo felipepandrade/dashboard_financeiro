@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from io import BytesIO
 from services.provisioning_service import ProvisioningService
 from data.referencias_manager import (
     carregar_centros_gasto,
@@ -70,7 +71,7 @@ def exibir_hierarquia_card(hierarquia):
 # TABS
 # =============================================================================
 
-tab_novo, tab_lista = st.tabs(["➕ Nova Provisão", "📋 Compromissos Ativos"])
+tab_novo, tab_import, tab_lista = st.tabs(["➕ Nova Provisão", "📥 Importação em Lote", "📋 Compromissos Ativos"])
 
 # =============================================================================
 # TAB: NOVA PROVISÃO
@@ -154,7 +155,84 @@ with tab_novo:
                         st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
-# TAB: LISA
+# TAB: IMPORTAÇÃO EM LOTE
+# =============================================================================
+with tab_import:
+    st.markdown('<div class="section-header"><span class="section-title">Importar Provisões em Lote</span></div>', unsafe_allow_html=True)
+    
+    col_dl, col_up = st.columns([1, 2])
+    
+    with col_dl:
+        st.info("ℹ️ Baixe o modelo para preenchimento.")
+        
+        # Gerar Template
+        df_template = pd.DataFrame({
+            'descricao': ['Ex: Manutenção Preventiva'],
+            'valor_estimado': [1500.00],
+            'centro_gasto_codigo': ['01020504001'],
+            'conta_contabil_codigo': ['3010101'],
+            'mes_competencia': ['JAN'],
+            'fornecedor': ['Fornecedor XYZ'],
+            'tipo_despesa': ['Variavel'],
+            'justificativa_obz': ['Contrato anual']
+        })
+        
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_template.to_excel(writer, index=False, sheet_name='Modelo')
+        processed_data = output.getvalue()
+        
+        st.download_button(
+            label="📥 Baixar Modelo Excel",
+            data=processed_data,
+            file_name="template_provisoes.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+        
+    with col_up:
+        uploaded_file = st.file_uploader("Carregar Arquivo Preenchido (Excel/CSV)", type=['xlsx', 'csv'])
+        
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df_import = pd.read_csv(uploaded_file)
+            else:
+                df_import = pd.read_excel(uploaded_file)
+            
+            st.markdown("#### Pré-visualização")
+            st.dataframe(df_import.head(), use_container_width=True)
+            
+            if st.button("🚀 Processar Importação", type="primary"):
+                # Converter para lista de dicts
+                lista_dados = df_import.to_dict(orient='records')
+                
+                # Barra de progresso (fake visual, pois processamento é rápido em lote)
+                progress_text = "Importando registros..."
+                my_bar = st.progress(0, text=progress_text)
+                
+                # Chamar serviço
+                sucesso_count, erros = prov_service.criar_provisoes_em_lote(lista_dados)
+                
+                my_bar.progress(100, text="Finalizado!")
+                
+                if sucesso_count > 0:
+                    st.success(f"✅ {sucesso_count} provisões importadas com sucesso!")
+                
+                if erros:
+                    st.warning(f"⚠️ {len(erros)} registros falharam.")
+                    with st.expander("Ver Detalhes dos Erros"):
+                        for erro in erros:
+                            st.write(erro)
+                
+                if sucesso_count > 0 and not erros:
+                    st.balloons()
+                    
+        except Exception as e:
+            st.error(f"Erro ao ler arquivo: {e}")
+
+# =============================================================================
+# TAB: LISTA
 # =============================================================================
 with tab_lista:
     st.markdown('<div class="section-header"><span class="section-title">Compromissos em Aberto</span></div>', unsafe_allow_html=True)
