@@ -125,29 +125,38 @@ with tab_hist:
     st.markdown("### 🕰️ Histórico Realizado (P&L)")
     
     if pl_df_session is not None and not pl_df_session.empty:
-        st.info("Visualizando dados carregados na sessão atual.")
+        # st.info("Visualizando dados carregados na sessão atual.") # Remover info redundante
         
-        # Resumo
-        anos_disponiveis = pl_df_session['ano'].unique().tolist() if 'ano' in pl_df_session.columns else []
-        meses_hist = pl_df_session['mes'].nunique() if 'mes' in pl_df_session.columns else 0
-        total_hist = pl_df_session.query("tipo_valor == 'Realizado'")['valor'].sum()
+        # Filtro de Ano
+        anos_disponiveis = sorted(pl_df_session['ano'].unique().tolist()) if 'ano' in pl_df_session.columns else []
+        anos_selecionados = st.multiselect("📅 Filtrar Anos", anos_disponiveis, default=anos_disponiveis)
+        
+        if anos_selecionados:
+            df_hist_view = pl_df_session[pl_df_session['ano'].isin(anos_selecionados)]
+        else:
+            df_hist_view = pl_df_session
+            
+        # Resumo KPI
+        meses_hist = df_hist_view['mes'].nunique() if 'mes' in df_hist_view.columns else 0
+        total_hist = df_hist_view.query("tipo_valor == 'Realizado'")['valor'].sum()
         
         c1, c2, c3 = st.columns(3)
-        with c1: exibir_kpi_card("Total Realizado", formatar_valor_brl(total_hist), f"Anos: {anos_disponiveis}")
+        with c1: exibir_kpi_card("Total Realizado", formatar_valor_brl(total_hist), f"Anos: {anos_selecionados}")
         with c2: exibir_kpi_card("Meses Carregados", str(meses_hist), "Meses Fechados")
-        with c3: exibir_kpi_card("Registros", f"{len(pl_df_session):,}", "Linhas P&L")
+        with c3: exibir_kpi_card("Registros", f"{len(df_hist_view):,}", "Linhas P&L")
         
         st.divider()
         
-        st.dataframe(pl_df_session, use_container_width=True, height=500)
+        st.dataframe(df_hist_view, use_container_width=True, height=500)
         
     else:
         st.warning("⚠️ Nenhum histórico carregado na sessão.")
         st.markdown("""
         Para visualizar o histórico:
         1. Vá para a página **Home** 🏠
-        2. Faça upload do arquivo de **P&L (Realizado)**
-        3. Retorne a esta aba conferir os dados brutos
+        2. Faça upload do arquivo de **P&L (Realizado)** selecionando o ano correto.
+        3. Você pode carregar múltiplos anos (ex: 2024, 2025, 2026) sequencialmente.
+        4. Retorne a esta aba para conferir os dados consolidados.
         """)
 
 # -----------------------------------------------------------------------------

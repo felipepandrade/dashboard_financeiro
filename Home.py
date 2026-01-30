@@ -75,15 +75,22 @@ col_upload, col_info = st.columns([1, 1])
 with col_upload:
     st.info("ℹ️ Utilize esta área para carregar o **P&L Oficial** (Razão/Balancete) exportado do ERP para conciliação mensal.")
     
+    ano_upload = st.selectbox(
+        "📅 Ano de Referência",
+        [2026, 2025, 2024],
+        index=0,
+        help="Selecione o ano a que se referem os dados do arquivo."
+    )
+    
     uploaded_file = st.file_uploader(
-        "Selecione o arquivo de P&L (Excel/CSV)", 
+        f"Selecione o arquivo de P&L {ano_upload} (Excel/CSV)", 
         type=['xlsx', 'xls', 'csv'],
-        key="upload_pl"
+        key=f"upload_pl_{ano_upload}" # Chave dinâmica para resetar ao mudar ano
     )
     
     if uploaded_file:
-        with st.spinner("Processando P&L..."):
-            sucesso, msg, detalhes = processar_upload_pl(uploaded_file)
+        with st.spinner(f"Processando P&L {ano_upload}..."):
+            sucesso, msg, detalhes = processar_upload_pl(uploaded_file, ano=ano_upload)
             
             if sucesso:
                 st.success(f"✅ {msg}")

@@ -59,6 +59,8 @@
 ## ✅ Fase 8.1: Visualização de Dados (Novo Requisito)
 
 - [x] Criar página `04_📚_Biblia_Financeira.py` (Orçamento 2026 + Metadados)
+- [x] Implementar suporte a múltiplos anos (2024, 2025) no upload de P&L
+- [x] Adicionar filtro de anos na visualização de histórico
 
 ## 📊 Fase 8: Consolidação e Histórico
 
