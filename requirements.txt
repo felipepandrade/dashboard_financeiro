@@ -8,6 +8,7 @@ statsmodels
 matplotlib
 google-generativeai
 openai
+alembic
 scikit-learn
 sqlalchemy
 watchdog
