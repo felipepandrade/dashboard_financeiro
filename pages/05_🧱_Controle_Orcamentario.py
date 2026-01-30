@@ -152,35 +152,116 @@ with tab_remanejamento:
 # =============================================================================
 # ABA 2: JUSTIFICATIVA OBZ (FEATURE E)
 # =============================================================================
+# =============================================================================
+# ABA 2: JUSTIFICATIVA OBZ (FEATURE E)
+# =============================================================================
 with tab_obz:
-    st.markdown('<div class="section-header"><span class="section-title">Justificativa Base Zero (OBZ)</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header"><span class="section-title">🛡️ Justificativa Base Zero (OBZ)</span></div>', unsafe_allow_html=True)
     
-    col_obz1, col_obz2 = st.columns([1, 1])
+    # Seletor de Centro para OBZ (pode ser diferente do remanejamento)
+    col_sel_obz, col_info_obz = st.columns([1, 2])
+    with col_sel_obz:
+        centro_obz = st.selectbox("Selecione o Centro de Custo", lista_centros, format_func=lambda x: map_centro_desc.get(x, x), key='centro_obz')
     
-    with col_obz1:
-        st.markdown("""
-        <div style="background-color: #1e293b; padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
-            <h4 style="color: #f59e0b; margin-top: 0;">🎯 Metodologia OBZ</h4>
-            <p>Nesta seção, você deve justificar a necessidade e essencialidade de pacotes de gastos específicos, 
-            classificando-os conforme sua criticidade para a operação.</p>
-            <p>O objetivo é eliminar desperdícios e garantir alocação eficiente de recursos.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_obz2:
-        st.info("🚧 Funcionalidade em desenvolvimento para a Fase 2 (Integração com P&L Histórico).")
+    if centro_obz:
+        # 1. Integração com Detalhes Operacionais (Lançamentos)
+        with st.expander("🔎 Detalhes Operacionais (Provisões Lançadas)", expanded=False):
+            detalhes = budget_service.get_detalhes_operacionais(centro_obz)
+            if detalhes:
+                df_det = pd.DataFrame(detalhes)
+                df_det['Valor'] = df_det['valor'].apply(formatar_valor_brl)
+                st.dataframe(
+                    df_det[['descricao', 'Valor', 'justificativa_item', 'tipo']],
+                    use_container_width=True,
+                    column_config={
+                        "descricao": "Item / Fornecedor",
+                        "justificativa_item": "Justificativa Operacional (Lançamentos)",
+                        "tipo": st.column_config.TextColumn("Tipo", width="small"),
+                        "Valor": st.column_config.TextColumn("Valor", width="small"),
+                    }
+                )
+                total_op = df_det['valor'].sum()
+                st.caption(f"Total Operacional Lançado: {formatar_valor_brl(total_op)}")
+            else:
+                st.info("Nenhuma provisão lançada para este centro.")
 
-    # Mock Visual
-    st.markdown("#### Prévia da Matriz de Essencialidade")
-    
-    df_mock = pd.DataFrame({
-        "Pacote de Gastos": ["Viagens Corporativas", "Treinamento Técnico", "Licenças de Software", "Confraternizações"],
-        "Valor Orçado 2026": [50000, 20000, 15000, 10000],
-        "Classificação OBZ": ["Necessário / Não Crítico", "Estratégico / Crítico", "Obrigatório / Legal", "Desejável"],
-        "Ação Recomendada": ["Reduzir 20%", "Manter", "Renegociar", "Cortar"]
-    })
-    
-    df_mock['Valor Orçado 2026'] = df_mock['Valor Orçado 2026'].apply(formatar_valor_brl)
-    
-    st.dataframe(df_mock, use_container_width=True)
+        st.markdown("---")
+
+        # 2. Gerenciamento de Pacotes OBZ
+        col_form_obz, col_view_obz = st.columns([1, 2])
+        
+        with col_form_obz:
+            st.markdown("#### 📦 Novo Pacote de Decisão")
+            with st.form("form_obz_pack", clear_on_submit=True):
+                pacote_nome = st.text_input("Nome do Pacote", placeholder="Ex: Viagens, TI, Consultoria")
+                valor_pack = st.number_input("Valor Orçado (R$)", min_value=0.0, step=1000.0, format="%.2f")
+                classificacao = st.selectbox("Classificação / Criticidade", [
+                    "Obrigatório (Legal/Compliance)", 
+                    "Estratégico (Crescimento)", 
+                    "Necessário (Operação)", 
+                    "Desejável (Melhoria)"
+                ])
+                desc_pack = st.text_area("Defesa do Pacote", placeholder="Justifique a necessidade deste pacote baseando-se nos detalhes operacionais...", height=150)
+                
+                resp = st.text_input("Responsável", value="Gestor Atual")
+                
+                if st.form_submit_button("Salvar Pacote", type="primary", use_container_width=True):
+                    if not pacote_nome or valor_pack <= 0 or not desc_pack:
+                        st.error("Preencha todos os campos obrigatórios.")
+                    else:
+                        budget_service.salvar_justificativa_obz({
+                            "centro_gasto_codigo": centro_obz,
+                            "pacote": pacote_nome,
+                            "valor_orcado": valor_pack,
+                            "classificacao": classificacao,
+                            "descricao": desc_pack,
+                            "usuario_responsavel": resp
+                        })
+                        st.success("Pacote salvo com sucesso!")
+                        st.rerun()
+
+        with col_view_obz:
+            st.markdown("#### 📊 Matriz de Essencialidade")
+            
+            # Listar Pacotes
+            pacotes = budget_service.listar_justificativas_obz(centro_obz)
+            
+            if pacotes:
+                df_packs = pd.DataFrame(pacotes)
+                
+                # Gráfico de Dispersão (Matriz)
+                import plotly.express as px
+                
+                # Mapear cores para classificação
+                color_map = {
+                    "Obrigatório (Legal/Compliance)": "#ef4444", # Red
+                    "Estratégico (Crescimento)": "#3b82f6", # Blue
+                    "Necessário (Operação)": "#f59e0b", # Amber
+                    "Desejável (Melhoria)": "#10b981"  # Emerald
+                }
+                
+                fig = px.scatter(
+                    df_packs, 
+                    x="valor_orcado", 
+                    y="classificacao", 
+                    size="valor_orcado", 
+                    color="classificacao",
+                    hover_data=["pacote", "descricao"],
+                    color_discrete_map=color_map,
+                    title="Matriz Valor x Criticidade",
+                    labels={"valor_orcado": "Valor Orçado", "classificacao": "Criticidade"}
+                )
+                fig.update_layout(height=350, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font_color="white")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Tabela Resumo
+                st.markdown("#### Pacotes Cadastrados")
+                for p in pacotes:
+                    with st.expander(f"📦 {p['pacote']} - {formatar_valor_brl(p['valor_orcado'])} ({p['classificacao']})"):
+                        st.write(p['descricao'])
+                        st.caption(f"Responsável: {p['usuario_responsavel']} | Atualizado em: {p['data_atualizacao']}")
+            else:
+                st.info("Nenhum pacote cadastrado para este centro.")
+    else:
+        st.warning("Selecione um Centro de Custo para iniciar a justificativa OBZ.")
 

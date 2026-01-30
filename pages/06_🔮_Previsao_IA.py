@@ -11,16 +11,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 from services.forecast_service import ForecastService
 from services.ai_board import AIBoard
+from services.provisioning_service import ProvisioningService
 from data.comparador import get_comparativo_mensal, get_realizado_agregado_por_mes
 
-# Configuração da Página
-st.set_page_config(
-    page_title="Previsão e Inteligência - 2026",
-    page_icon="🔮",
-    layout="wide"
-)
+from utils_ui import setup_page
 
-# CSS Personalizado
+# Configuração da Página
+setup_page("Previsão e Inteligência - 2026", "🔮")
+
+# CSS Personalizado Adicional (específico desta página)
 st.markdown("""
     <style>
         .board-card {
@@ -47,12 +46,15 @@ st.title("🔮 Inteligência e Previsão")
 st.markdown("---")
 
 # Verificar Chaves de API
-if 'api_key' not in st.session_state:
-    st.warning("⚠️ Chave de API de IA não configurada. Vá para a página inicial.")
-    st.stop()
+if 'api_key' not in st.session_state or not st.session_state['api_key']:
+    st.warning("⚠️ **IA Desabilitada:** Insira sua chave de API na Barra Lateral (Sidebar) para habilitar os recursos de inteligência.")
+    # Não vamos parar (stop), permitindo ver o Forecast matemático, mas desabilitando o Board.
+else:
+    st.caption("✅ Inteligência Artificial Ativa")
 
 # Serviços
 forecast_service = ForecastService()
+prov_service = ProvisioningService()
 ai_board = AIBoard(st.session_state['api_key'], st.session_state.get('ai_provider', 'Gemini (Google)'))
 
 tabs = st.tabs(["🤖 AI Board Advisor", "📈 Previsão de Fechamento (Forecast)"])
@@ -199,12 +201,30 @@ with tabs[1]:
                 df_real = get_comparativo_mensal(2026)
                 fig.add_trace(go.Bar(name='Realizado', x=df_real['mes'], y=df_real['realizado'], marker_color='#059669'))
                 
+                # Provisões (Compromissado - Synergy Feature)
+                saldos_prov = prov_service.get_saldo_provisoes_por_mes()
+                # Mapear para lista ordenada pelos meses
+                # Importar MESES_ORDEM localmente ou definir
+                MESES_ORDEM = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
+                vals_prov = [saldos_prov.get(m, 0.0) for m in MESES_ORDEM]
+                
+                fig.add_trace(go.Bar(
+                    name='Compromissado (Provisões)', 
+                    x=MESES_ORDEM, 
+                    y=vals_prov, 
+                    marker_color='#F59E0B',
+                    opacity=0.6,
+                    hoverinfo='y+name'
+                ))
+                
                 # Previsto
-                fig.add_trace(go.Bar(name='Forecast', x=df_forecast['mes'], y=df_forecast['valor_previsto'], marker_color='#A78BFA'))
+                # Forecast geralmente cobre meses futuros.
+                fig.add_trace(go.Bar(name='Forecast (Tendência)', x=df_forecast['mes'], y=df_forecast['valor_previsto'], marker_color='#A78BFA'))
                 
                 # Budget (Linha)
                 fig.add_trace(go.Scatter(name='Budget Plan', x=df_real['mes'], y=df_real['orcado'], mode='lines', line=dict(color='#4F8BF9', width=3)))
                 
+                fig.update_layout(barmode='overlay') # Sobrepor barras para melhor comparação
                 st.plotly_chart(fig, use_container_width=True)
                 
                 # Tabela de Dados

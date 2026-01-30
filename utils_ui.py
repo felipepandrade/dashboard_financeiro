@@ -106,6 +106,52 @@ def setup_page(title: str, icon: str = "📊", layout: str = "wide"):
         initial_sidebar_state="expanded"
     )
     aplicar_estilo_premium()
+    
+    # -------------------------------------------------------------------------
+    # SIDEBAR GLOBAL (Configurações)
+    # -------------------------------------------------------------------------
+    with st.sidebar:
+        st.logo("https://img.icons8.com/color/48/data-configuration.png" , icon_image="https://img.icons8.com/color/48/data-configuration.png") # Placeholder ou use local se tiver
+        
+        st.markdown("### ⚙️ Configurações do Sistema")
+        
+        # Gestão de Chaves de API (Centralizada)
+        if 'api_key' not in st.session_state:
+            # Tentar carregar de variável de ambiente (Local Development)
+            import os
+            try:
+                from dotenv import load_dotenv
+                load_dotenv()
+            except: pass
+            st.session_state['api_key'] = os.getenv("GEMINI_API_KEY", "")
+            
+        api_key_input = st.text_input(
+            "🔑 Chave de API (IA)",
+            value=st.session_state.get('api_key', ''),
+            type="password",
+            help="Insira sua chave Google Gemini ou OpenAI para habilitar os recursos de inteligência."
+        )
+        st.session_state['api_key'] = api_key_input
+        
+        # Provedor de IA
+        if 'ai_provider' not in st.session_state:
+            st.session_state['ai_provider'] = "Gemini (Google)"
+            
+        provider = st.selectbox(
+            "🧠 Provedor de Inteligência",
+            ["Gemini (Google)", "OpenAI (GPT-4)"],
+            index=0 if "Gemini" in st.session_state['ai_provider'] else 1
+        )
+        st.session_state['ai_provider'] = provider
+        
+        # Indicador de Status
+        if st.session_state['api_key']:
+            st.success("IA Habilitada ✅")
+        else:
+            st.warning("IA Desabilitada ⚠️")
+            
+        st.divider()
+        st.info("💡 Dica: Use a sidebar para navegar entre os módulos.")
 
 def exibir_kpi_card(label: str, valor: str, delta: str = None, cor_delta: str = "neutral"):
     """Renderiza um card de KPI estilizado."""

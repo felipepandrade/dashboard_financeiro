@@ -84,75 +84,94 @@ with tab_novo:
     with st.container():
         st.markdown('<div class="section-header"><span class="section-title">Cadastrar Obrigação</span></div>', unsafe_allow_html=True)
         
-        with st.form("form_provisao", clear_on_submit=True):
-            col_a1, col_a2 = st.columns(2)
-            
-            with col_a1:
-                descricao = st.text_input("Descrição do Compromisso", placeholder="Ex: Manutenção Preventiva Compressores")
-                fornecedor = st.text_input("Fornecedor (Opcional)", placeholder="Razão Social ou Nome")
-            
-            with col_a2:
-                valor = st.number_input("Valor Estimado (R$)", min_value=0.0, step=100.0, format="%.2f")
-                tipo_despesa = st.selectbox("Classificação", ["Variavel", "Fixa", "Emergencial"])
+        # Formulário Aberto (Sem st.form para permitir interatividade/callbacks)
+        col_a1, col_a2 = st.columns(2)
+        
+        with col_a1:
+            descricao = st.text_input("Descrição do Compromisso", placeholder="Ex: Manutenção Preventiva Compressores")
+            fornecedor = st.text_input("Fornecedor (Opcional)", placeholder="Razão Social ou Nome")
+        
+        with col_a2:
+            valor = st.number_input("Valor Estimado (R$)", min_value=0.0, step=100.0, format="%.2f")
+            tipo_despesa = st.selectbox("Classificação", ["Variavel", "Fixa", "Emergencial"])
 
-            st.markdown("#### 📅 Competência e Alocação")
-            col_b1, col_b2, col_b3 = st.columns(3)
+        st.markdown("#### 📅 Competência e Alocação")
+        col_b1, col_b2, col_b3 = st.columns(3)
+        
+        with col_b1:
+            mes = st.selectbox("Mês Competência", MESES_ORDEM)
+        
+        with col_b2:
+            # Selectbox inteligente para centros
+            opcoes_centros = []
+            if not df_centros.empty:
+                opcoes_centros = df_centros.apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1).tolist()
             
-            with col_b1:
-                mes = st.selectbox("Mês Competência", MESES_ORDEM)
-            
-            with col_b2:
-                # Selectbox inteligente para centros
-                opcoes_centros = []
-                if not df_centros.empty:
-                    opcoes_centros = df_centros.apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1).tolist()
+            centro_sel = st.selectbox("Centro de Custo", options=opcoes_centros, placeholder="Selecione...", index=None)
+
+        with col_b3:
+            # Selectbox inteligente para contas
+            opcoes_contas = []
+            if not df_contas.empty:
+                opcoes_contas = df_contas.apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1).tolist()
                 
-                centro_sel = st.selectbox("Centro de Custo", options=opcoes_centros, placeholder="Selecione...", index=None)
+            conta_sel = st.selectbox("Conta Contábil", options=opcoes_contas, placeholder="Selecione...", index=None)
 
-            with col_b3:
-                # Selectbox inteligente para contas
-                opcoes_contas = []
-                if not df_contas.empty:
-                    opcoes_contas = df_contas.apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1).tolist()
-                    
-                conta_sel = st.selectbox("Conta Contábil", options=opcoes_contas, placeholder="Selecione...", index=None)
+        # Hierarquia Preview
+        if centro_sel:
+            cod_centro = centro_sel.split(' - ')[0]
+            h = get_hierarquia_centro(cod_centro, df_centros)
+            exibir_hierarquia_card(h)
 
-            # Hierarquia Preview
-            if centro_sel:
-                cod_centro = centro_sel.split(' - ')[0]
-                h = get_hierarquia_centro(cod_centro, df_centros)
-                exibir_hierarquia_card(h)
+        st.markdown("#### 📄 Dados Contratuais & Sistêmicos")
+        col_c1, col_c2, col_c3 = st.columns(3)
+        
+        with col_c1:
+            num_contrato = st.text_input("Número do Contrato (Opcional)", placeholder="Ex: CTR-2026/001")
+        
+        with col_c2:
+            # O st.radio agora dispara rerun, atualizando o estado para o próximo render
+            cadastrado_sis = st.radio("Cadastrado no Sistema (Oracle/Fusion)?", ["Não", "Sim"], horizontal=True, index=0)
+        
+        with col_c3:
+            # Disabled atualizado dinamicamente
+            num_registro = st.text_input("Número do Registro/RC/Pedido", placeholder="Obrigatório se cadastrado", disabled=(cadastrado_sis == "Não"))
 
-            justificativa = st.text_area("Justificativa / Detalhes (OBZ)", placeholder="Por que este gasto é necessário?", height=100)
+        justificativa = st.text_area("Justificativa / Detalhes (OBZ)", placeholder="Por que este gasto é necessário?", height=100)
 
-            st.markdown("---")
-            if st.form_submit_button("💾 Registrar Compromisso", type="primary", use_container_width=True):
-                # Validação
-                erros = []
-                if not descricao: erros.append("Descrição obrigatória")
-                if valor <= 0: erros.append("Valor deve ser maior que zero")
-                if not centro_sel: erros.append("Centro de Custo obrigatório")
-                if not conta_sel: erros.append("Conta Contábil obrigatória")
+        st.markdown("---")
+        if st.button("💾 Registrar Compromisso", type="primary", use_container_width=True):
+            # Validação
+            erros = []
+            if not descricao: erros.append("Descrição obrigatória")
+            if valor <= 0: erros.append("Valor deve ser maior que zero")
+            if not centro_sel: erros.append("Centro de Custo obrigatório")
+            if not conta_sel: erros.append("Conta Contábil obrigatória")
+            if cadastrado_sis == "Sim" and not num_registro: erros.append("Número do Registro é obrigatório para item cadastrado")
 
-                if erros:
-                    for e in erros: st.error(f"❌ {e}")
-                else:
-                    try:
-                        dados = {
-                            "descricao": f"{descricao} ({fornecedor})" if fornecedor else descricao,
-                            "valor_estimado": valor,
-                            "centro_gasto_codigo": centro_sel.split(' - ')[0],
-                            "conta_contabil_codigo": conta_sel.split(' - ')[0],
-                            "mes_competencia": mes,
-                            "tipo_despesa": tipo_despesa,
-                            "justificativa_obz": justificativa,
-                            "usuario": "Sistema" 
-                        }
-                        prov_service.criar_provisao(dados)
-                        st.session_state.sucesso_prov = "✅ Provisão registrada com sucesso!"
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar: {e}")
+            if erros:
+                for e in erros: st.error(f"❌ {e}")
+            else:
+                try:
+                    dados = {
+                        "descricao": f"{descricao} ({fornecedor})" if fornecedor else descricao,
+                        "valor_estimado": valor,
+                        "centro_gasto_codigo": centro_sel.split(' - ')[0],
+                        "conta_contabil_codigo": conta_sel.split(' - ')[0],
+                        "mes_competencia": mes,
+                        "tipo_despesa": tipo_despesa,
+                        "justificativa_obz": justificativa,
+                        "usuario": "Sistema",
+                        # Novos Campos
+                        "numero_contrato": num_contrato,
+                        "cadastrado_sistema": True if cadastrado_sis == "Sim" else False,
+                        "numero_registro": num_registro
+                    }
+                    prov_service.criar_provisao(dados)
+                    st.session_state.sucesso_prov = "✅ Provisão registrada com sucesso!"
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao salvar: {e}")
 
 # =============================================================================
 # TAB: IMPORTAÇÃO EM LOTE
@@ -174,7 +193,10 @@ with tab_import:
             'mes_competencia': ['JAN'],
             'fornecedor': ['Fornecedor XYZ'],
             'tipo_despesa': ['Variavel'],
-            'justificativa_obz': ['Contrato anual']
+            'justificativa_obz': ['Contrato anual'],
+            'numero_contrato': ['CTR-123'],
+            'cadastrado_sistema': ['Sim'],
+            'numero_registro': ['RC-999']
         })
         
         output = BytesIO()

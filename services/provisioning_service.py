@@ -4,7 +4,7 @@ services/provisioning_service.py
 Serviço para gestão do ciclo de vida de provisões (Feature B).
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
 from database.models import Provisao, LancamentoRealizado, get_session
@@ -22,7 +22,11 @@ class ProvisioningService:
                 mes_competencia=dados['mes_competencia'],
                 justificativa_obz=dados.get('justificativa_obz'),
                 tipo_despesa=dados.get('tipo_despesa', 'Variavel'),
-                usuario=dados.get('usuario')
+                usuario=dados.get('usuario'),
+                # Novos campos
+                numero_contrato=dados.get('numero_contrato'),
+                cadastrado_sistema=dados.get('cadastrado_sistema', False),
+                numero_registro=dados.get('numero_registro')
             )
             session.add(nova)
             session.commit()
@@ -92,6 +96,11 @@ class ProvisioningService:
                     if fornecedor:
                         desc = f"{desc} ({fornecedor})"
                         
+                    # Converter 'cadastrado_sistema' de string/excel para boolean
+                    cadastrado = dados.get('cadastrado_sistema', False)
+                    if isinstance(cadastrado, str):
+                        cadastrado = cadastrado.lower() in ['sim', 's', 'true', '1']
+                    
                     nova = Provisao(
                         descricao=desc,
                         valor_estimado=float(dados['valor_estimado']),
@@ -100,7 +109,11 @@ class ProvisioningService:
                         mes_competencia=dados['mes_competencia'],
                         justificativa_obz=dados.get('justificativa_obz'),
                         tipo_despesa=dados.get('tipo_despesa', 'Variavel'),
-                        usuario=dados.get('usuario', 'Importação em Lote')
+                        usuario=dados.get('usuario', 'Importação em Lote'),
+                        # Novos campos
+                        numero_contrato=str(dados.get('numero_contrato', '')) if dados.get('numero_contrato') else None,
+                        cadastrado_sistema=bool(cadastrado),
+                        numero_registro=str(dados.get('numero_registro', '')) if dados.get('numero_registro') else None
                     )
                     session.add(nova)
                     sucesso_count += 1
@@ -134,6 +147,24 @@ class ProvisioningService:
             return True
         except Exception as e:
             session.rollback()
-            raise e
+            session.close()
+
+    def get_saldo_provisoes_por_mes(self) -> dict:
+        """
+        Retorna dicionário {mes: valor_total} de provisões PENDENTES.
+        Útil para overlay em gráficos de forecast.
+        """
+        session = get_session()
+        try:
+            results = session.query(
+                Provisao.mes_competencia, 
+                Provisao.valor_estimado
+            ).filter(Provisao.status == 'PENDENTE').all()
+            
+            saldo_mes = {}
+            for mes, valor in results:
+                saldo_mes[mes] = saldo_mes.get(mes, 0.0) + valor
+                
+            return saldo_mes
         finally:
             session.close()

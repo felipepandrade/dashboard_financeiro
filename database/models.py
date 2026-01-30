@@ -253,6 +253,11 @@ class Provisao(Base):
     justificativa_obz = Column(Text)
     tipo_despesa = Column(String(20), default='Variavel') # Core, Nice-to-have, etc.
     
+    # Novos Campos (Fase 8.3)
+    numero_contrato = Column(String(50), nullable=True)
+    cadastrado_sistema = Column(Boolean, default=False)
+    numero_registro = Column(String(50), nullable=True) # SE, Fusion, RC
+    
     # Vínculo com lançamento real (quando a provisão se concretiza)
     lancamento_realizado_id = Column(Integer, nullable=True) # FK lógica
     
@@ -269,7 +274,10 @@ class Provisao(Base):
             'conta_contabil_codigo': self.conta_contabil_codigo,
             'mes_competencia': self.mes_competencia,
             'status': self.status,
-            'justificativa_obz': self.justificativa_obz
+            'justificativa_obz': self.justificativa_obz,
+            'numero_contrato': self.numero_contrato,
+            'cadastrado_sistema': self.cadastrado_sistema,
+            'numero_registro': self.numero_registro
         }
 
 class Remanejamento(Base):
@@ -309,4 +317,31 @@ class Remanejamento(Base):
             'valor': self.valor,
             'status': self.status,
             'justificativa': self.justificativa
+        }
+
+class JustificativaOBZ(Base):
+    """
+    Justificativas de pacotes de gastos para o Orçamento Base Zero (Feature E).
+    """
+    __tablename__ = 'obz_justificativas'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    centro_gasto_codigo = Column(String(11), nullable=False, index=True)
+    pacote = Column(String(100), nullable=False) # Ex: Viagens, TI, Consultoria
+    descricao = Column(Text, nullable=False)
+    valor_orcado = Column(Float, nullable=False)
+    classificacao = Column(String(20), nullable=False) # Necessário, Estratégico, etc.
+    usuario_responsavel = Column(String(100))
+    data_atualizacao = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'centro_gasto_codigo': self.centro_gasto_codigo,
+            'pacote': self.pacote,
+            'descricao': self.descricao,
+            'valor_orcado': self.valor_orcado,
+            'classificacao': self.classificacao,
+            'usuario_responsavel': self.usuario_responsavel,
+            'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None
         }

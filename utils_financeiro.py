@@ -85,92 +85,68 @@ def _standardize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-@st.cache_data(show_spinner="Processando P&L...")
-def processar_pl_baseal(uploaded_file, ano: int = None) -> pd.DataFrame:
+@st.cache_data(show_spinner="Processando Arquivo Financeiro Completo...")
+def processar_upload_completo(uploaded_file, ano: int = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Processa a aba 'P&L BASEAL' do arquivo financeiro.
+    Processa o arquivo Excel financeiro, extraindo P&L e Razão de Gastos.
     
     Args:
-        uploaded_file: Arquivo Excel carregado via Streamlit
-        ano: Ano de referência dos dados (default: ano atual)
+        uploaded_file: Arquivo Excel
+        ano: Ano de referência
         
     Returns:
-        DataFrame processado com colunas: 
-        [data, ano, mes, mes_num, conta_contabil, tipo_valor, valor, 
-         codigo_centro_gasto, centro_gasto_nome]
+        Tuple[pd.DataFrame, pd.DataFrame]: (df_pl, df_razao)
     """
     if not uploaded_file:
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
     
-    # Definir ano padrão se não informado
     if ano is None:
         ano = datetime.now().year
     
+    # -------------------------------------------------------------------------
+    # 1. PROCESSAR P&L
+    # -------------------------------------------------------------------------
+    df_pl = pd.DataFrame()
     try:
+        if hasattr(uploaded_file, 'seek'): uploaded_file.seek(0)
         df = pd.read_excel(uploaded_file, sheet_name='P&L BASEAL', skiprows=15, header=0)
         df.fillna(0, inplace=True)
         
-        # Renomear colunas iniciais
-        df.rename(columns={
-            df.columns[0]: 'codigo_centro_gasto', 
-            df.columns[2]: 'conta_contabil'
-        }, inplace=True)
+        # Renomear e limpar
+        df.rename(columns={df.columns[0]: 'codigo_centro_gasto', df.columns[2]: 'conta_contabil'}, inplace=True)
         
-        # Contas financeiras adicionais
         contas_financeiras = [
             "Gross Sales - Basic Services", "Gross Sales - Eventual Services",
             "Sales tax - Basic", "Sales tax - Eventual", "Net Revenue",
             "Gross profit", "Gross margin (%)", "Cost of Sales"
         ]
         
-        # Separar custos e financeiro
         df_custos = df[df['codigo_centro_gasto'] != 0].copy()
-        df_financeiro = df[
-            (df['codigo_centro_gasto'] == 0) & 
-            (df['conta_contabil'].isin(contas_financeiras))
-        ].copy()
+        df_financeiro = df[(df['codigo_centro_gasto'] == 0) & (df['conta_contabil'].isin(contas_financeiras))].copy()
         
-        # Padronizar código centro de custo
         df_custos['codigo_centro_gasto'] = (
-            df_custos['codigo_centro_gasto']
-            .astype(str)
+            df_custos['codigo_centro_gasto'].astype(str)
             .str.replace(r'\.0$', '', regex=True)
             .apply(lambda x: '0' + x if len(x) == 10 else x)
         )
         
-        # Mapeamento centro de custo
         mapa_centro_custo = {
-            '01020504001': 'Gerência Regional BA',
-            '1020504001': 'Gerência Regional BA',
-            '01020504101': 'Coordenação Catu',
-            '1020504101': 'Coordenação Catu',
-            '01020504102': 'ECOMP CATU - BA',
-            '1020504102': 'ECOMP CATU - BA',
-            '01020504204': 'BASE CATU - BA',
-            '1020504204': 'BASE CATU - BA',
-            '01020504201': 'Coordenação Estacionário BA',
-            '1020504201': 'Coordenação Estacionário BA',
-            '01020504202': 'BASE CAMAÇARI - BA',
-            '1020504202': 'BASE CAMAÇARI - BA',
-            '01020504203': 'BASE ITABUNA - BA',
-            '1020504203': 'BASE ITABUNA - BA',
-            '01020505201': 'Coordenação Estacionar SE/AL',
-            '1020505201': 'Coordenação Estacionar SE/AL',
-            '01020505202': 'BASE ATALAIA - SE',
-            '1020505202': 'BASE ATALAIA - SE',
-            '01020505203': 'BASE PILAR - AL',
-            '1020505203': 'BASE PILAR - AL'
+            '01020504001': 'Gerência Regional BA', '1020504001': 'Gerência Regional BA',
+            '01020504101': 'Coordenação Catu', '1020504101': 'Coordenação Catu',
+            '01020504102': 'ECOMP CATU - BA', '1020504102': 'ECOMP CATU - BA',
+            '01020504204': 'BASE CATU - BA', '1020504204': 'BASE CATU - BA',
+            '01020504201': 'Coordenação Estacionário BA', '1020504201': 'Coordenação Estacionário BA',
+            '01020504202': 'BASE CAMAÇARI - BA', '1020504202': 'BASE CAMAÇARI - BA',
+            '01020504203': 'BASE ITABUNA - BA', '1020504203': 'BASE ITABUNA - BA',
+            '01020505201': 'Coordenação Estacionar SE/AL', '1020505201': 'Coordenação Estacionar SE/AL',
+            '01020505202': 'BASE ATALAIA - SE', '1020505202': 'BASE ATALAIA - SE',
+            '01020505203': 'BASE PILAR - AL', '1020505203': 'BASE PILAR - AL'
         }
         
         df_custos['centro_gasto_nome'] = df_custos['codigo_centro_gasto'].map(mapa_centro_custo)
-        
-        # Concatenar custos e financeiro
         df_processado = pd.concat([df_custos, df_financeiro], ignore_index=True)
-        
-        # Colunas identificadoras
         colunas_identificadoras = ['codigo_centro_gasto', 'centro_gasto_nome', 'conta_contabil']
         
-        # Mapeamento de colunas de mês
         mapa_colunas_mes = {
             'JAN': {3: 'Realizado', 4: 'Budget V1', 6: 'Budget V3', 7: 'LY - Actual'},
             'FEV': {8: 'Realizado', 9: 'Budget V1', 11: 'Budget V3', 12: 'LY - Actual'},
@@ -187,117 +163,69 @@ def processar_pl_baseal(uploaded_file, ano: int = None) -> pd.DataFrame:
         }
         
         lista_dfs_meses = []
-        
         for mes, mapa_indices in mapa_colunas_mes.items():
             cols_id_existentes = [col for col in colunas_identificadoras if col in df_processado.columns]
             cols_idx_existentes = [df_processado.columns[i] for i in mapa_indices.keys() if i < len(df_processado.columns)]
             
             df_mes_temp = df_processado[cols_id_existentes + cols_idx_existentes].copy()
-            
-            mapa_rename = {
-                df_processado.columns[i]: nome_final 
-                for i, nome_final in mapa_indices.items() 
-                if i < len(df_processado.columns)
-            }
+            mapa_rename = {df_processado.columns[i]: nome_final for i, nome_final in mapa_indices.items() if i < len(df_processado.columns)}
             df_mes_temp.rename(columns=mapa_rename, inplace=True)
             df_mes_temp['mes'] = mes
             
             value_vars_existentes = [v for v in mapa_rename.values() if v in df_mes_temp.columns]
             id_vars_melt = cols_id_existentes + ['mes']
             
-            df_melted = df_mes_temp.melt(
-                id_vars=id_vars_melt,
-                value_vars=value_vars_existentes,
-                var_name='tipo_valor',
-                value_name='valor'
-            )
+            df_melted = df_mes_temp.melt(id_vars=id_vars_melt, value_vars=value_vars_existentes, var_name='tipo_valor', value_name='valor')
             lista_dfs_meses.append(df_melted)
         
-        if not lista_dfs_meses:
-            st.error("P&L: Nenhuma coluna de mês/valor encontrada.")
-            return pd.DataFrame()
-        
-        df_final = pd.concat(lista_dfs_meses, ignore_index=True)
-        df_final['mes_num'] = df_final['mes'].map(MESES_NUM_MAP)
-        df_final['ano'] = ano
-        df_final['data'] = pd.to_datetime(
-            dict(year=df_final['ano'], month=df_final['mes_num'], day=1)
-        )
-        df_final['valor'] = pd.to_numeric(df_final['valor'], errors='coerce').fillna(0)
-        
-        return df_final
-        
+        if lista_dfs_meses:
+            df_pl = pd.concat(lista_dfs_meses, ignore_index=True)
+            df_pl['mes_num'] = df_pl['mes'].map(MESES_NUM_MAP)
+            df_pl['ano'] = ano
+            df_pl['data'] = pd.to_datetime(dict(year=df_pl['ano'], month=df_pl['mes_num'], day=1))
+            df_pl['valor'] = pd.to_numeric(df_pl['valor'], errors='coerce').fillna(0)
     except Exception as e:
         st.error(f"Erro ao processar P&L: {e}")
-        return pd.DataFrame()
+        df_pl = pd.DataFrame()
 
-
-@st.cache_data(show_spinner="Processando Razão de Gastos...")
-def processar_razao_gastos(uploaded_file) -> pd.DataFrame:
-    """
-    Processa a aba 'Razão_Gastos'
-    (Versão completa do 'utils - old.py' fornecida pelo usuário)
-    """
-    if not uploaded_file:
-        return pd.DataFrame()
+    # -------------------------------------------------------------------------
+    # 2. PROCESSAR RAZÃO DE GASTOS
+    # -------------------------------------------------------------------------
+    df_razao = pd.DataFrame()
     try:
-        # Tenta ler a aba específica. Se não existir, retorna DF vazio.
+        if hasattr(uploaded_file, 'seek'): uploaded_file.seek(0)
         try:
-            df = pd.read_excel(uploaded_file, sheet_name='Razão_Gastos', header=1)
+            df_r = pd.read_excel(uploaded_file, sheet_name='Razão_Gastos', header=1)
+            
+            df_r = _standardize_columns(df_r)
+            RENAME_MAP = {'valor_credito': 'valor', 'nome_do_fornecedor': 'fornecedor'}
+            df_r.rename(columns=RENAME_MAP, inplace=True)
+            
+            if 'centro_gasto' in df_r.columns:
+                df_r.rename(columns={'centro_gasto': 'codigo_centro_gasto'}, inplace=True)
+                df_r['codigo_centro_gasto'] = df_r['codigo_centro_gasto'].astype(str).str.replace(r'\.0$', '', regex=True)
+                df_r['codigo_centro_gasto'] = df_r['codigo_centro_gasto'].apply(lambda x: '0' + x if len(x) == 10 else x)
+                df_r['centro_gasto_nome'] = df_r['codigo_centro_gasto'].map(mapa_centro_custo) # Reusing map from P&L scope if compatible or redefine
+            else:
+                df_r['centro_gasto_nome'] = 'N/A'
+                
+            if 'valor' in df_r.columns:
+                df_r['valor'] = pd.to_numeric(df_r['valor'], errors='coerce').fillna(0)
+            else:
+                df_r['valor'] = 0
+                
+            if 'fornecedor' not in df_r.columns: df_r['fornecedor'] = 'N/A'
+            
+            df_razao = df_r
+            
         except ValueError:
-            st.sidebar.warning("Aba 'Razão_Gastos' não encontrada no arquivo P&L.")
-            return pd.DataFrame()
+            # Aba não encontrada, não é erro crítico, apenas retorna vazio
+            pass
             
-        df = _standardize_columns(df)
-        
-        RENAME_MAP = {
-            'valor_credito': 'valor', # Padronizado de 'VALOR CRÉDITO'
-            'nome_do_fornecedor': 'fornecedor' # Padronizado de 'Nome do Fornecedor'
-            # Adicionar outros mapeamentos se necessário
-        }
-        df.rename(columns=RENAME_MAP, inplace=True)
-        
-        # Processa centro de gasto se a coluna existir (padronizado de 'CENTRO GASTO')
-        if 'centro_gasto' in df.columns:
-            df.rename(columns={'centro_gasto': 'codigo_centro_gasto'}, inplace=True)
-            df['codigo_centro_gasto'] = df['codigo_centro_gasto'].astype(str).str.replace(r'\.0$', '', regex=True)
-            df['codigo_centro_gasto'] = df['codigo_centro_gasto'].apply(lambda x: '0' + x if len(x) == 10 else x)
-            
-            # Mapa de centro de custo (o mesmo do P&L)
-            mapa_centro_custo = {
-                '01020504001': 'Gerência Regional BA', '1020504001': 'Gerência Regional BA',
-                '01020504101': 'Coordenação Catu', '1020504101': 'Coordenação Catu',
-                '01020504102': 'ECOMP CATU - BA', '1020504102': 'ECOMP CATU - BA',
-                '01020504204': 'BASE CATU - BA', '1020504204': 'BASE CATU - BA',
-                '01020504201': 'Coordenação Estacionário BA', '1020504201': 'Coordenação Estacionário BA',
-                '01020504202': 'BASE CAMAÇARI - BA', '1020504202': 'BASE CAMAÇARI - BA',
-                '01020504203': 'BASE ITABUNA - BA', '1020504203': 'BASE ITABUNA - BA',
-                '01020505201': 'Coordenação Estacionar SE/AL', '1020505201': 'Coordenação Estacionar SE/AL',
-                '01020505202': 'BASE ATALAIA - SE', '1020505202': 'BASE ATALAIA - SE',
-                '01020505203': 'BASE PILAR - AL', '1020505203': 'BASE PILAR - AL'
-            }
-            df['centro_gasto_nome'] = df['codigo_centro_gasto'].map(mapa_centro_custo)
-        else:
-            st.warning("Razão: Coluna 'centro_gasto' não encontrada. Análise por centro de custo pode falhar.")
-            df['centro_gasto_nome'] = 'N/A' # Cria coluna para evitar erros
-
-        # Garante que a coluna 'valor' exista
-        if 'valor' in df.columns:
-            df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0)
-        else:
-            st.warning("Razão: Coluna 'valor' (de 'valor_credito') não encontrada. Gastos de fornecedores serão zero.")
-            df['valor'] = 0 
-            
-        # Garante que a coluna 'fornecedor' exista
-        if 'fornecedor' not in df.columns:
-             st.warning("Razão: Coluna 'fornecedor' (de 'nome_do_fornecedor') não encontrada.")
-             df['fornecedor'] = 'N/A'
-             
-        return df
-
     except Exception as e:
-        st.error(f"Erro crítico ao processar a aba 'Razão_Gastos': {e}")
-        return pd.DataFrame()
+        st.error(f"Erro ao processar Razão: {e}")
+
+    return df_pl, df_razao
 
 
 @st.cache_data(show_spinner="Processando aba de orçamento...")
@@ -384,243 +312,81 @@ def processar_razao_gastos(uploaded_file) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-@st.cache_data(show_spinner="Processando aba de orçamento...")
-def processar_aba_orcamento(
-    uploaded_file,
-    sheet_name: str,
-    ano_referencia: int = 2025
-) -> pd.DataFrame:  
-    try:
-        # 1. Ler o arquivo com o cabeçalho na linha 2 (índice 1)
-        if hasattr(uploaded_file, 'seek'):
-            uploaded_file.seek(0)
-        
-        df_raw = pd.read_excel(uploaded_file, sheet_name=sheet_name, header=1) 
 
-        # 2. Definir o mapeamento fixo de colunas (baseado no input do usuário)
-        original_columns = df_raw.columns.tolist()
+# =============================================================================
+# 4. VALIDAÇÃO DE DADOS (PANDERA)
+# =============================================================================
 
-        # A=0, B=1, ..., F=5, G=6, ..., BB=53
-        if len(original_columns) < 54:
-            st.warning(f"Orçamento: Estrutura inesperada na aba {sheet_name}. Menos de 54 colunas (A-BB) encontradas. Pulando aba.")
-            return pd.DataFrame()
+# Schema para P&L
+SCHEMA_PL = DataFrameSchema(
+    columns={
+        'codigo_centro_gasto': Column(str, nullable=True, coerce=True),
+        'centro_gasto_nome': Column(str, nullable=True, coerce=True),
+        'conta_contabil': Column(str, nullable=False, coerce=True),
+        'mes': Column(str, checks=[Check.isin(MESES_ORDEM)], nullable=False, coerce=True),
+        'tipo_valor': Column(
+            str, 
+            checks=[Check.isin(['Realizado', 'Budget V1', 'Budget V3', 'LY - Actual'])], 
+            nullable=False, 
+            coerce=True
+        ),
+        'valor': Column(float, checks=[Check.greater_than_or_equal_to(0)], nullable=False, coerce=True),
+        'ano': Column(int, checks=[Check.in_range(2000, datetime.now().year + 5)], nullable=False, coerce=True),
+        'data': Column(pa.DateTime, nullable=False, coerce=True)
+    },
+    strict=False,
+    coerce=True
+)
 
-        # Mapeamento dos metadados (A-F)
-        col_map = {
-            original_columns[0]: 'centro_gasto_descricao',
-            original_columns[1]: 'servico_consumo',
-            original_columns[2]: 'codigo_conta',
-            original_columns[3]: 'descricao_conta',
-            original_columns[4]: 'tipo_gasto',
-            original_columns[5]: 'fornecedor',
+class ValidadorDados:
+    """Validador de dados financeiros usando Pandera."""
+    
+    def __init__(self):
+        self.schemas = {
+            'pl': SCHEMA_PL
         }
-        
-        # Mapeamento dos meses (G-BB)
-        col_idx = 6
-        for mes in MESES_ORDEM:
-            if col_idx + 3 >= len(original_columns):
-                break
-            col_map[original_columns[col_idx]] = f"{mes}_PREVISTO"
-            col_map[original_columns[col_idx+1]] = f"{mes}_REALIZADO"
-            col_map[original_columns[col_idx+2]] = f"{mes}_DIFERENCA"
-            col_map[original_columns[col_idx+3]] = f"{mes}_PERCENTUAL"
-            col_idx += 4
-        
-        # 3. Selecionar apenas as colunas mapeadas e renomear
-        df_renamed = df_raw[col_map.keys()].rename(columns=col_map)
-        
-        # 4. Filtrar linhas inválidas
-        df_filtrado = df_renamed[
-            df_renamed['fornecedor'].notna() & 
-            (df_renamed['fornecedor'] != 'Fornecedor')
-        ].copy()
-        
-        if df_filtrado.empty:
-            st.warning(f"Orçamento: Nenhum dado válido após filtro na aba {sheet_name}.")
-            return pd.DataFrame()
-            
-        df_filtrado['base_operacional'] = sheet_name
-        df_filtrado['ano'] = ano_referencia
-        
-        linhas_long = []
-        
-        meta_cols = [
-            'base_operacional', 'ano', 'centro_gasto_descricao', 'servico_consumo', 
-            'codigo_conta', 'descricao_conta', 'tipo_gasto', 'fornecedor'
-        ]
-        
-        # 5. Pivotar (wide para long)
-        for _, row in df_filtrado.iterrows():
-            for mes in MESES_ORDEM:
-                col_prev = f"{mes}_PREVISTO"
-                col_real = f"{mes}_REALIZADO"
-                col_diff = f"{mes}_DIFERENCA"
-                col_pct = f"{mes}_PERCENTUAL"
-
-                try:
-                    previsto = pd.to_numeric(row[col_prev], errors='coerce')
-                    realizado = pd.to_numeric(row[col_real], errors='coerce')
-                    diferenca = pd.to_numeric(row[col_diff], errors='coerce')
-                    percentual = pd.to_numeric(row[col_pct], errors='coerce')
-
-                    if pd.isna(previsto) and pd.isna(realizado):
-                        continue
-
-                    previsto = 0.0 if pd.isna(previsto) else float(previsto)
-                    realizado = 0.0 if pd.isna(realizado) else float(realizado)
-                    
-                    if pd.isna(diferenca):
-                        diferenca = realizado - previsto
-                    else:
-                        diferenca = float(diferenca)
-                    
-                    if pd.isna(percentual):
-                        percentual = (diferenca / previsto * 100) if previsto != 0 else 0.0
-                    else:
-                        percentual = float(percentual)
-
-                    nova_linha = {
-                        'mes': mes,
-                        'previsto': previsto,
-                        'realizado': realizado,
-                        'diferenca': diferenca,
-                        'percentual_desvio': percentual
-                    }
-                    
-                    for meta_col in meta_cols:
-                        nova_linha[meta_col] = row.get(meta_col, 'N/A')
-
-                    linhas_long.append(nova_linha)
-                    
-                except KeyError:
-                    break
-                except Exception as e_inner:
-                    st.warning(f"Orçamento: Erro ao processar linha para mês {mes} na aba {sheet_name}: {e_inner}")
-                    continue
-
-        return pd.DataFrame(linhas_long)
     
-    except Exception as e:
-        st.error(f"Erro geral ao processar aba de orçamento '{sheet_name}': {str(e)}")
-        return pd.DataFrame()
-
-
-@st.cache_data(show_spinner="Processando Acompanhamento de Orçamento...")
-def processar_acompanhamento_orcamento_completo(
-    uploaded_file,
-    ano_referencia: int = 2025
-) -> pd.DataFrame:
-    """
-    Processa todas as abas do arquivo e consolida em um único DataFrame.
-    """
-    dfs_consolidados = []
+    def _formatar_erros(self, schema_errors: pa.errors.SchemaErrors) -> List[Dict]:
+        """Formata erros do Pandera para exibição."""
+        erros_detalhados = []
+        if schema_errors.failure_cases is not None and not schema_errors.failure_cases.empty:
+            for erro in schema_errors.failure_cases.itertuples():
+                erros_detalhados.append({
+                    'coluna': getattr(erro, 'column', 'DataFrame'),
+                    'check': getattr(erro, 'check', 'N/A'),
+                    'index': getattr(erro, 'index', 'N/A'),
+                    'valor_falha': getattr(erro, 'failure_case', 'N/A')
+                })
+        return erros_detalhados
     
-    try:
-        excel_file = pd.ExcelFile(uploaded_file)
-        abas_disponiveis = excel_file.sheet_names
-        abas_a_processar = [aba for aba in ABAS_PROCESSAR if aba in abas_disponiveis]
-    except Exception as e:
-        st.error(f"Não foi possível ler as abas do arquivo Excel: {e}")
-        return pd.DataFrame()
-
-    if not abas_a_processar:
-        st.error(f"Nenhuma das abas esperadas ({', '.join(ABAS_PROCESSAR)}) foi encontrada no arquivo.")
-        return pd.DataFrame()
-
-    st.info(f"📋 Processando {len(abas_a_processar)} abas encontradas...")
-    progress_bar = st.progress(0)
-    
-    for idx, aba in enumerate(abas_a_processar):
+    def validar_pl(self, df: pd.DataFrame, lazy: bool = True) -> Tuple[bool, Optional[pd.DataFrame], Dict]:
+        """Valida DataFrame de P&L."""
         try:
-            uploaded_file.seek(0)
-            df_aba = processar_aba_orcamento(uploaded_file, aba, ano_referencia)
-            
-            if not df_aba.empty:
-                dfs_consolidados.append(df_aba)
-            else:
-                st.warning(f"⚠️ {aba}: Nenhum dado válido encontrado após processamento")
-        
-        except Exception as e:
-            st.error(f"❌ Erro na aba '{aba}': {str(e)}")
-        
-        progress_bar.progress((idx + 1) / len(abas_a_processar))
-    
-    if not dfs_consolidados:
-        st.error("❌ Nenhuma aba foi processada com sucesso ou continha dados válidos.")
-        return pd.DataFrame()
-    
-    df_final = pd.concat(dfs_consolidados, ignore_index=True)
-    df_final = limpar_e_enriquecer_dados(df_final)
-    
-    st.success(f"✅ **Total consolidado (Orçamento): {len(df_final):,} registros de {len(dfs_consolidados)} bases**")
-    
-    return df_final
+            df_validado = self.schemas['pl'].validate(df, lazy=lazy)
+            relatorio = {
+                'status': 'SUCESSO',
+                'total_linhas': len(df),
+                'linhas_validas': len(df_validado),
+                'erros': []
+            }
+            return True, df_validado, relatorio
+        except pa.errors.SchemaErrors as e:
+            erros_fmt = self._formatar_erros(e)
+            relatorio = {
+                'status': 'FALHA',
+                'total_linhas': len(df),
+                'linhas_com_erro': len(e.failure_cases) if e.failure_cases is not None else 1,
+                'erros': erros_fmt
+            }
+            return False, None, relatorio
 
 
-def limpar_e_enriquecer_dados(df: pd.DataFrame) -> pd.DataFrame:
-    """Limpa, padroniza e adiciona métricas calculadas ao DataFrame de Orçamento."""
-    df = df.copy()
-    
-    colunas_string = ['fornecedor', 'servico_consumo', 'descricao_conta', 
-                      'tipo_gasto', 'centro_gasto_descricao']
-    for col in colunas_string:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.strip().str.upper().replace('NAN', 'N/A')
-    
-    if 'codigo_conta' in df.columns:
-        df['codigo_centro_gasto'] = df['codigo_conta'].apply(
-            lambda x: str(int(x)).zfill(11) if pd.notna(x) and isinstance(x, (int, float)) and x != 0 else 'N/A'
-        )
-    else:
-        df['codigo_centro_gasto'] = 'N/A'
+# =============================================================================
+# 5. VISUALIZAÇÕES AVANÇADAS
+# =============================================================================
 
-    df['aderencia_orcamento'] = np.where(
-        df['previsto'] != 0,
-        (df['realizado'] / df['previsto']) * 100,
-        np.nan
-    )
-    
-    def classificar_desvio(row):
-        aderencia = row['aderencia_orcamento']
-        if pd.isna(aderencia):
-            if row['realizado'] == 0:
-                return 'ZERO_PREV_REAL'
-            else:
-                return 'SEM_PREVISAO'
-        
-        if aderencia <= 90: return 'ABAIXO_10'
-        elif 90 < aderencia <= 110: return 'DENTRO_META'
-        elif 110 < aderencia <= 120: return 'ACIMA_10_20'
-        else: return 'CRITICO_20'
-    
-    df['status_desvio'] = df.apply(classificar_desvio, axis=1)
-    
-    if 'ano' in df.columns and 'mes' in df.columns:
-        df['mes_num'] = df['mes'].map(MESES_NUM_MAP)
-        df_valid_dates = df.dropna(subset=['ano', 'mes_num'])
-        df['data'] = pd.to_datetime(
-            dict(year=df_valid_dates['ano'], month=df_valid_dates['mes_num'], day=1), errors='coerce'
-        )
-    else:
-        st.warning("Orçamento: Colunas 'ano' ou 'mes' não encontradas para criar data.")
-        df['data'] = pd.NaT
 
-    df['desvio_significativo'] = (abs(df['diferenca']) > 5000)
-    
-    sort_cols = ['base_operacional', 'data', 'fornecedor']
-    sort_cols_exist = [col for col in sort_cols if col in df.columns]
-    if sort_cols_exist:
-        df = df.sort_values(sort_cols_exist).reset_index(drop=True)
-         
-    required_final = ['base_operacional', 'fornecedor', 'servico_consumo', 'mes', 'ano', 'previsto', 'realizado', 'diferenca', 'status_desvio', 'data']
-    for col in required_final:
-        if col not in df.columns:
-            st.error(f"Orçamento: Coluna essencial '{col}' não gerada na limpeza.")
-            if col == 'data': df[col] = pd.NaT
-            elif col in ['previsto', 'realizado', 'diferenca']: df[col] = 0.0
-            else: df[col] = 'N/A'
 
-    return df
 
 
 # =============================================================================
@@ -831,32 +597,98 @@ def plot_heatmap_desvios(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def plot_stl_decomposition(df: pd.DataFrame, date_col: str, value_col: str) -> go.Figure:
-    """Decomposição STL de série temporal."""
-    df_sorted = df.sort_values(date_col)
-    df_sorted.set_index(date_col, inplace=True)
-    
-    # Agregar valores duplicados
-    df_sorted = df_sorted.groupby(level=0)[value_col].sum()
-    
-    # Decomposição
-    decomposition = seasonal_decompose(df_sorted, model='additive', period=12, extrapolate_trend='freq')
-    
-    # Criar subplots
-    fig = make_subplots(
-        rows=4, cols=1,
-        subplot_titles=('Original', 'Tendência', 'Sazonalidade', 'Resíduos'),
-        vertical_spacing=0.08
-    )
-    
-    fig.add_trace(go.Scatter(x=df_sorted.index, y=df_sorted.values, mode='lines', name='Original'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df_sorted.index, y=decomposition.trend, mode='lines', name='Tendência'), row=2, col=1)
-    fig.add_trace(go.Scatter(x=df_sorted.index, y=decomposition.seasonal, mode='lines', name='Sazonalidade'), row=3, col=1)
-    fig.add_trace(go.Scatter(x=df_sorted.index, y=decomposition.resid, mode='lines', name='Resíduos'), row=4, col=1)
-    
-    fig.update_layout(height=800, title_text="Decomposição STL da Série Temporal", showlegend=False)
-    
-    return fig
+def plot_robust_forecast(df, date_col, value_col, periods=3):
+    """
+    Gera um gráfico de previsão robusto para séries curtas (< 24 meses) ou longas.
+    Usa Holt-Winters se possível, ou Regressão Linear Simples se dados insuficientes.
+    """
+    try:
+        df_proc = df.copy()
+        df_proc[date_col] = pd.to_datetime(df_proc[date_col])
+        df_proc = df_proc.sort_values(date_col).set_index(date_col)
+        
+        # Agrupar mensalmente para garantir regularidade
+        ts = df_proc[value_col].resample('MS').sum().fillna(0)
+        
+        # Trabalhar com valores absolutos para evitar erros de log/multiplicativo com negativos
+        ts_abs = ts.abs()
+        was_negative = (ts.mean() < 0)
+        
+        df_plot = pd.DataFrame({'Realizado': ts_abs})
+        
+        # Previsão Simples (Média Móvel Exponencial + Tendência Linear)
+        # Se tivermos poucos dados (< 12), usamos apenas uma média simples projetada
+        if len(ts) < 4:
+            return None # Muito poucos dados
+            
+        # Estimativa de tendência linear simples
+        from sklearn.linear_model import LinearRegression
+        import numpy as np
+        
+        X = np.arange(len(ts)).reshape(-1, 1)
+        y = ts_abs.values
+        model = LinearRegression()
+        model.fit(X, y)
+        
+        # Projetar futuro
+        last_idx = len(ts)
+        future_X = np.arange(last_idx, last_idx + periods).reshape(-1, 1)
+        future_y = model.predict(future_X)
+        
+        # Criar datas futuras
+        last_date = ts.index[-1]
+        future_dates = [last_date + pd.DateOffset(months=i+1) for i in range(periods)]
+        
+        df_forecast = pd.DataFrame({'Previsão': future_y}, index=future_dates)
+        
+        # Unir para plot
+        df_final = pd.concat([df_plot, df_forecast])
+        
+        # Reverter sinal se era despesa (negativo)
+        if was_negative:
+            df_final = df_final * -1
+            
+        fig = go.Figure()
+        
+        # Série Realizada
+        fig.add_trace(go.Scatter(
+            x=df_final.index[:-periods], 
+            y=df_final['Realizado'].iloc[:-periods],
+            mode='lines+markers',
+            name='Realizado',
+            line=dict(color='#3b82f6', width=3)
+        ))
+        
+        # Série Previsão (Linha tracejada)
+        fig.add_trace(go.Scatter(
+            x=df_final.index[-periods-1:], # Conectar com último ponto real
+            y=df_final['Realizado'].iloc[-periods-1:].fillna(0) + df_final['Previsão'].iloc[-periods-1:].fillna(0), # Truque para pegar ponta
+            mode='lines+markers',
+            name='Tendência Projetada',
+            line=dict(color='#10b981', dash='dash', width=3)
+        ))
+        
+        # Adicionar Previsão puramente (caso overlap falhe)
+        fig.add_trace(go.Scatter(
+             x=df_forecast.index,
+             y=df_final['Previsão'].dropna(),
+             mode='markers',
+             name='Previsão',
+             marker=dict(color='#10b981', size=8)
+        ))
+
+        fig.update_layout(
+            title="Projeção de Tendência (Linear)",
+            xaxis_title="Mês",
+            yaxis_title="Valor (R$)",
+            template="plotly_dark",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        return fig
+        
+    except Exception as e:
+        print(f"Erro na previsão: {e}")
+        return Nonefig
 
 
 # =============================================================================
@@ -1388,6 +1220,7 @@ def processar_upload_pl(uploaded_file, ano: int = None) -> Tuple[bool, str, Dict
     """
     Wrapper para processar upload de P&L com validação.
     Suporta múltiplos anos via merge no session_state.
+    Também processa e armazena Razão de Gastos.
     """
     if not uploaded_file:
         return False, "Nenhum arquivo enviado", {}
@@ -1396,11 +1229,11 @@ def processar_upload_pl(uploaded_file, ano: int = None) -> Tuple[bool, str, Dict
         ano = datetime.now().year
         
     try:
-        # Processar com o ano informado
-        df = processar_pl_baseal(uploaded_file, ano=ano)
+        # Processar com o ano informado usando a nova função unificada
+        df, df_razao = processar_upload_completo(uploaded_file, ano=ano)
         
         if not df.empty:
-            # Lógica de Merge no Session State
+            # --- Lógica de Merge do P&L no Session State ---
             if 'pl_df' not in st.session_state or st.session_state['pl_df'] is None:
                 st.session_state['pl_df'] = df
             else:
@@ -1412,21 +1245,34 @@ def processar_upload_pl(uploaded_file, ano: int = None) -> Tuple[bool, str, Dict
                 # Concatenar
                 st.session_state['pl_df'] = pd.concat([df_existente, df], ignore_index=True)
             
+            # --- Lógica de Persistência do Razão ---
+            # Para o Razão, assumimos que o upload substitui ou adiciona. 
+            # Como o Razão é auxiliar, vamos simplificar: Substituir ou adicionar a lista?
+            # Melhor: Substituir o Razão atual pelo novo upload (assumindo que o usuário carrega o arquivo completo do mês/ano)
+            # Mas se ele carregar 2024 e depois 2025? Precisamos talvez guardar por ano?
+            # Por simplificação nesta fase: Armazenamos o último carregado ou tentamos conciliar.
+            # Vamos armazenar o do último upload por enquanto, ou melhor, adicionar ao session_state['razao_df'] se não existir, 
+            # ou substituir se for do mesmo contexto.
+            # DECISÃO: Sobrescrever st.session_state['razao_df'] para garantir consistência com o arquivo carregado
+            st.session_state['razao_df'] = df_razao
+            
             # Gerar resumo acumulado
             df_atual = st.session_state['pl_df']
             anos_carregados = sorted(df_atual['ano'].unique().tolist()) if 'ano' in df_atual.columns else [ano]
             
             resumo = {
-                'total_registros': len(df_atual),
+                'total_registros_pl': len(df_atual),
+                'total_registros_razao': len(df_razao) if not df_razao.empty else 0,
                 'anos': anos_carregados,
                 'meses_por_ano': df_atual.groupby('ano')['mes'].nunique().to_dict(),
                 'total_realizado': f"R$ {df_atual[df_atual['tipo_valor']=='Realizado']['valor'].sum():,.2f}"
             }
             st.session_state['pl_resumo_importacao'] = resumo
             
-            return True, f"Importação de {ano} concluída. Anos carregados: {anos_carregados}", resumo
+            msg_razao = " (+ Razão)" if not df_razao.empty else ""
+            return True, f"Importação de {ano} concluída{msg_razao}. Anos carregados: {anos_carregados}", resumo
         else:
-            return False, "Falha ao processar arquivo. Verifique o formato.", {}
+            return False, "Falha ao processar arquivo P&L. Verifique o formato.", {}
     except Exception as e:
         return False, f"Erro ao processar: {e}", {}
 

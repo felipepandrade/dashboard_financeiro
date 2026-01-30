@@ -35,7 +35,9 @@
   - [x] Definir Personas (CFO, Controller, Auditor, Analyst)
   - [x] Integrar `NotebookLM` via MCP (Contexto estendido)
   - [x] Log de raciocínio multi-agente
-- [x] **Frontend**: Aba "Previsão & Inteligência" no Dashboard
+- [x] **Frontend**: Aba "Previsão & Inteligência" no Dashboard (`06_🔮_Previsao_IA.py`)
+  - [x] Renomeado de 04 para 06 para evitar conflito
+  - [x] Integração com Provisões (Sinergia Operacional) no gráfico de Forecast
 
 ## ✅ Fase 6: Gestão de Provisões (Feature B)
 
@@ -69,6 +71,13 @@
 - [x] Implementar aba "Importação em Lote" na página `02_📝_Lancamentos.py`
 - [x] Implementar lógica de leitura e validação do arquivo de importação
 
+## 📝 Fase 8.3: Enriquecimento de Dados de Provisão (Novo Requisito)
+
+- [x] **Database**: Adicionar colunas `numero_contrato`, `cadastrado_sistema`, `numero_registro`
+- [x] **Backend**: Atualizar service para persistir novos campos (Unitário e Lote)
+- [x] **Frontend**: Atualizar formulário com campos condicionais
+- [x] **Frontend**: Atualizar template de importação e lógica de leitura
+
 ## 📊 Fase 8: Consolidação e Histórico
 
 - [x] Processar P&L Dez/2025 para histórico comparativo
@@ -83,3 +92,13 @@
 - [x] Refatorar `05_Controle_Orcamentario.py` (Foco em Remanejamentos, remover redundâncias)
 - [x] Unificar UI Global (Estilo Premium em todas as páginas)
 - [x] Refatorar `01_Analise_Financeira.py` (Aplicar UI Premium)
+- [x] **Feature E**: Implementar Justificativa OBZ Real (DB, Backend, UI)
+
+## ♻️ Fase 10: Refatoração e Otimização (Legacy Cleanup)
+
+- [ ] **Módulo Análise Financeira (`01_Analytics`)**
+  - [ ] Remover abas obsoletas: "Acompanhamento Orçamentário", "Qualidade de Dados", "Previsão Financeira" (Redundante)
+  - [ ] Limpeza de código morto em `utils_financeiro.py` (Scripts de importação de orçamento antigo)
+  - [ ] Restaurar funcionalidade de "Análise de Fornecedores" (Incluir carga da aba 'Razão_Gastos' no upload do P&L)
+  - [ ] Review de Código: Melhorar nomes, performance e tipagem
+  - [ ] UI/UX Review: Aplicar estilo Premium e simplificar navegação
