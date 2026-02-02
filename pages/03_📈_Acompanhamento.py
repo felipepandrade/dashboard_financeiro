@@ -111,57 +111,61 @@ def get_cor_desvio(desvio_pct: float) -> str:
 
 
 def criar_grafico_comparativo_mensal(df: pd.DataFrame) -> go.Figure:
-    """Cria gráfico de barras comparativo mensal."""
+    """Cria gráfico de barras comparativo mensal (Orçado vs Realizado + Provisionado)."""
     
     fig = go.Figure()
     
-    # Barras de orçado
+    # 1. Orçado (Barra separada)
     fig.add_trace(go.Bar(
         name='Orçado',
         x=df['mes'],
         y=df['orcado'],
         marker_color=CORES['orcado'],
         text=[formatar_valor_brl(v, True) for v in df['orcado']],
-        textposition='outside',
-        hovertemplate='<b>%{x}</b><br>Orçado: %{y:,.2f}<extra></extra>'
+        textposition='auto',
+        offsetgroup=0
     ))
     
-    # Barras de realizado
+    # 2. Realizado (Parte de baixo da pilha de execução)
     fig.add_trace(go.Bar(
-        name='Realizado',
+        name='Realizado (Pago)',
         x=df['mes'],
         y=df['realizado'],
         marker_color=CORES['realizado'],
         text=[formatar_valor_brl(v, True) for v in df['realizado']],
-        textposition='outside',
-        hovertemplate='<b>%{x}</b><br>Realizado: %{y:,.2f}<extra></extra>'
+        textposition='auto',
+        offsetgroup=1,
+    ))
+
+    # 3. Provisionado (Parte de cima da pilha)
+    # Para empilhar visualmente sobre o realizado no mesmo 'offsetgroup', 
+    # usamos 'base' ou simplesmente configuramos barmode='stack' para o layout global?
+    # Se usarmos barmode='group', eles ficam lado a lado.
+    # Truque: Usar 'base' = df['realizado']?
+    # Sim, Bar(base=...) funciona.
+    
+    fig.add_trace(go.Bar(
+        name='Provisionado (Pendente)',
+        x=df['mes'],
+        y=df['provisionado'],
+        base=df['realizado'], # Empilha sobre o realizado
+        marker_color='#f59e0b', # Amarelo/Laranja
+        text=[formatar_valor_brl(v, True) for v in df['provisionado']],
+        textposition='auto',
+        offsetgroup=1, # Mesmo grupo do realizado para alinhar verticalmente
+        hovertemplate='<b>%{x}</b><br>Prov: %{y:,.2f}<br>Base Real: %{base:,.2f}<extra></extra>'
     ))
     
     fig.update_layout(
-        barmode='group',
+        barmode='group', # Grupos principais (0=Orcado, 1=Executado) lado a lado
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color=CORES['texto']),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
+        legend=dict(orientation="h", y=1.02),
         margin=dict(l=20, r=20, t=40, b=20),
         height=400,
-        xaxis=dict(
-            showgrid=False,
-            showline=True,
-            linecolor='#475569'
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor='#334155',
-            showline=False,
-            tickformat=',.0f'
-        )
+        xaxis=dict(showgrid=False, title=None),
+        yaxis=dict(showgrid=True, gridcolor='#334155', tickformat=',.0f')
     )
     
     return fig
@@ -341,39 +345,31 @@ with col1:
     )
 
 with col2:
-    # Determinar cor do delta
-    desvio = kpis['desvio']
-    cor_delta = "positive" if desvio > 0 else "neutral"  # Adaptar conforme lógica de negócio/tema
-    # No tema premium: positive = vermelho (atenção), neutral/negative = verde?
-    # Vamos usar a convenção: desvio positivo (gasto a mais) = danger (vermelho), desvio negativo = success
-    # Como utils_ui não tem "danger" explícito no argumento cor_delta, vamos passar a classe do utils_ui se soubermos,
-    # mas o utils_ui aceita qualquer string como classe.
-    # Na verdade utils_ui espera "neutral", "positive" (vermelho), "negative" (verde) se basear no CSS legado?
-    # Vamos checar utils_ui.py:
-    # CORES = {'desvio_neg': '#ef4444', ...} 
-    # exibir_kpi_card usa delta_html = f'<div class="kpi-delta {cor_delta}"...'
-    # Se passarmos "negative" (verde) ou "positive" (vermelho) baseado no CSS antigo.
-    # Vamos assumir: desvio > 0 (estouro) -> 'kpi-delta-danger' (se existir) ou apenas passar texto formatado.
+    # Mostra Total EXECUTADO (Real + Prov)
+    total_exec = kpis['total_realizado'] + kpis['total_provisionado']
     
-    delta_txt = f"{formatar_valor_brl(desvio)} ({kpis['desvio_pct']:+.1f}%)"
+    delta_txt = f"{formatar_valor_brl(kpis['desvio'])} ({kpis['desvio_pct']:+.1f}%)"
+    
     exibir_kpi_card(
-        "Total Realizado",
-        formatar_valor_brl(kpis['total_realizado']),
+        "Executado (Real + Prov)",
+        formatar_valor_brl(total_exec),
         delta_txt
     )
 
 with col3:
+    # Card extra ou detalhe
     exibir_kpi_card(
-        "Execução Orçamentária",
-        f"{kpis['execucao_pct']:.1f}%",
-        None
+        "Em Aberto (Provisões)",
+        formatar_valor_brl(kpis['total_provisionado']),
+        None,
+        # help="Valores lançados como Pendentes"
     )
 
 with col4:
     exibir_kpi_card(
-        "Meses com Lançamentos",
-        f"{kpis['meses_com_dados']}/12",
-        None
+        "Execução %",
+        f"{kpis['execucao_pct']:.1f}%",
+        f"{kpis['meses_com_dados']}/12 m"
     )
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -414,11 +410,12 @@ with tab_mensal:
         df_display = df_mensal.copy()
         df_display['Orçado'] = df_display['orcado'].apply(formatar_valor_brl)
         df_display['Realizado'] = df_display['realizado'].apply(formatar_valor_brl)
+        df_display['Provisionado'] = df_display['provisionado'].apply(formatar_valor_brl)
         df_display['Desvio'] = df_display['desvio'].apply(formatar_valor_brl)
         df_display['Desvio %'] = df_display['desvio_pct'].apply(lambda x: f"{x:+.1f}%")
         
         st.dataframe(
-            df_display[['mes', 'Orçado', 'Realizado', 'Desvio', 'Desvio %']],
+            df_display[['mes', 'Orçado', 'Provisionado', 'Realizado', 'Desvio', 'Desvio %']],
             hide_index=True,
             use_container_width=True,
             column_config={
@@ -484,11 +481,12 @@ with tab_centro:
         df_display = df_centro.copy()
         df_display['Orçado'] = df_display['orcado'].apply(formatar_valor_brl)
         df_display['Realizado'] = df_display['realizado'].apply(formatar_valor_brl)
+        df_display['Provisionado'] = df_display['provisionado'].apply(formatar_valor_brl)
         df_display['Desvio'] = df_display['desvio'].apply(formatar_valor_brl)
         df_display['Desvio %'] = df_display['desvio_pct'].apply(lambda x: f"{x:+.1f}%")
         
         st.dataframe(
-            df_display[['centro_gasto_codigo', 'ativo', 'Orçado', 'Realizado', 'Desvio', 'Desvio %']],
+            df_display[['centro_gasto_codigo', 'ativo', 'Orçado', 'Provisionado', 'Realizado', 'Desvio', 'Desvio %']],
             hide_index=True,
             use_container_width=True,
             height=400
@@ -511,6 +509,7 @@ with tab_centro:
 # =============================================================================
 
 with tab_conta:
+    # ... (TAB CONTA MANTIDA - não tem provisionado por enquanto na lógica de comparador por conta) ...
     st.markdown('<div class="section-header"><span class="section-title">Análise por Conta Contábil</span></div>', unsafe_allow_html=True)
     
     # Filtro
@@ -601,12 +600,13 @@ with tab_ativo:
         df_display = df_resumo.copy()
         df_display['Orçado'] = df_display['orcado'].apply(formatar_valor_brl)
         df_display['Realizado'] = df_display['realizado'].apply(formatar_valor_brl)
+        df_display['Provisionado'] = df_display['provisionado'].apply(formatar_valor_brl)
         df_display['Desvio'] = df_display['desvio'].apply(formatar_valor_brl)
         df_display['Desvio %'] = df_display['desvio_pct'].apply(lambda x: f"{x:+.1f}%")
         df_display['Hierarquia'] = df_display['sem_hierarquia'].apply(lambda x: '⚠️ Sem hierarquia' if x else '✅ Com hierarquia')
         
         st.dataframe(
-            df_display[['ativo', 'qtd_centros', 'Orçado', 'Realizado', 'Desvio', 'Desvio %', 'Hierarquia']],
+            df_display[['ativo', 'qtd_centros', 'Orçado', 'Provisionado', 'Realizado', 'Desvio', 'Desvio %', 'Hierarquia']],
             hide_index=True,
             use_container_width=True
         )

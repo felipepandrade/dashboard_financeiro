@@ -168,3 +168,36 @@ class ProvisioningService:
             return saldo_mes
         finally:
             session.close()
+
+    def atualizar_provisao(self, prov_id: int, novos_dados: dict) -> bool:
+        """
+        Atualiza uma provisão existente.
+        Args:
+            prov_id: ID da provisão
+            novos_dados: Dict com campos a atualizar ('valor', 'status', 'numero_contrato', 'numero_registro')
+        """
+        session = get_session()
+        try:
+            provisao = session.query(Provisao).filter(Provisao.id == prov_id).first()
+            if not provisao:
+                return False
+            
+            # Atualizar campos se estiverem no dict
+            if 'valor' in novos_dados:
+                provisao.valor_estimado = float(novos_dados['valor'])
+            if 'status' in novos_dados:
+                provisao.status = novos_dados['status']
+            if 'numero_contrato' in novos_dados:
+                provisao.numero_contrato = novos_dados['numero_contrato']
+            if 'numero_registro' in novos_dados:
+                provisao.numero_registro = novos_dados['numero_registro']
+                
+            provisao.data_atualizacao = datetime.now()
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            print(f"Erro ao atualizar provisão: {e}")
+            return False
+        finally:
+            session.close()

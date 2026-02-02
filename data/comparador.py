@@ -246,26 +246,74 @@ def get_realizado_por_conta(mes: str = None, ano: int = 2026) -> pd.DataFrame:
 # FUNÇÕES DE COMPARAÇÃO
 # =============================================================================
 
+from services.provisioning_service import ProvisioningService
+
+# ... CONSTANTES ...
+
+def _get_provisoes_agregadas(agregacao: str = 'mes', ano: int = 2026) -> pd.DataFrame:
+    """Retorna previsões PENDENTES agregadas."""
+    try:
+        ps = ProvisioningService()
+        provs = ps.listar_provisoes(status='PENDENTE')
+        if not provs:
+            return pd.DataFrame()
+        
+        df = pd.DataFrame(provs)
+        # Filtrar apenas para o ano corrente se houver campo ano, assumindo ano corrente da competencia
+        # Como o modelo é simplificado, assumimos competencia do ano 2026
+        
+        if agregacao == 'mes':
+            df_agg = df.groupby('mes_competencia').agg({'valor_estimado': 'sum'}).reset_index()
+            df_agg.rename(columns={'mes_competencia': 'mes', 'valor_estimado': 'provisionado'}, inplace=True)
+            return df_agg
+            
+        elif agregacao == 'centro':
+            df_agg = df.groupby('centro_gasto_codigo').agg({'valor_estimado': 'sum'}).reset_index()
+            df_agg.rename(columns={'valor_estimado': 'provisionado'}, inplace=True)
+            return df_agg
+            
+        elif agregacao == 'conta':
+            df_agg = df.groupby('conta_contabil_codigo').agg({'valor_estimado': 'sum'}).reset_index()
+            df_agg.rename(columns={'valor_estimado': 'provisionado'}, inplace=True)
+            return df_agg
+            
+    except Exception as e:
+        print(f"Erro ao agregar provisões: {e}")
+        return pd.DataFrame()
+    return pd.DataFrame()
+
+
 def get_comparativo_mensal(ano: int = 2026) -> pd.DataFrame:
     """
-    Retorna comparativo orçado x realizado por mês.
+    Retorna comparativo orçado x realizado x provisionado por mês.
     
     Returns:
-        DataFrame com: mes, orcado, realizado, desvio, desvio_pct, status
+        DataFrame com: mes, orcado, realizado, provisionado, desvio, desvio_pct, status
     """
     # Obter dados
     df_orcado = get_orcamento_agregado_por_mes()
     df_realizado = get_realizado_agregado_por_mes(ano)
+    df_prov = _get_provisoes_agregadas('mes', ano)
     
-    # Merge
+    # Merge Orcado + Realizado
     df = df_orcado.merge(df_realizado, on='mes', how='outer')
+    
+    # Merge Provisionado
+    if not df_prov.empty:
+        df = df.merge(df_prov, on='mes', how='left')
+    else:
+        df['provisionado'] = 0.0
     
     # Preencher valores nulos
     df['valor_orcado'] = df['valor_orcado'].fillna(0)
     df['valor_realizado'] = df['valor_realizado'].fillna(0)
+    df['provisionado'] = df['provisionado'].fillna(0)
     
-    # Calcular desvios
-    df['desvio'] = df['valor_realizado'] - df['valor_orcado']
+    # Calcular Total Executado (Realizado + Provisionado)
+    df['total_executado'] = df['valor_realizado'] + df['provisionado']
+    
+    # Calcular desvios (Agora baseados no Executado Total)
+    df['desvio'] = df['total_executado'] - df['valor_orcado']
     df['desvio_pct'] = np.where(
         df['valor_orcado'] != 0,
         (df['desvio'] / df['valor_orcado']) * 100,
@@ -292,39 +340,70 @@ def get_comparativo_mensal(ano: int = 2026) -> pd.DataFrame:
 
 def get_comparativo_por_centro(mes: str = None, ano: int = 2026) -> pd.DataFrame:
     """
-    Retorna comparativo orçado x realizado por centro de custo.
-    
-    Args:
-        mes: Mês específico ou None para total do ano
-        ano: Ano de referência
-    
-    Returns:
-        DataFrame com: centro_gasto_codigo, ativo, orcado, realizado, desvio, desvio_pct
+    Retorna comparativo orçado x realizado x provisionado por centro de custo.
     """
     # Obter dados
     df_orcado = get_orcamento_por_centro(mes)
     df_realizado = get_realizado_por_centro(mes, ano)
     
-    if df_orcado.empty and df_realizado.empty:
+    # Para provisões por centro, se tivermos filtro de mês, precisamos passar?
+    # _get_provisoes_agregadas não aceita filtro mes ainda.
+    # Vamos melhorar _get_provisoes_agregadas internamente ou filtrar depois?
+    # Como _get_provisoes_agregadas faz 'groupby', se chamarmos sem filtro ela traz SUM de tudo.
+    # PRECISAMOS FILTRAR AS PROVISÕES PELO MÊS.
+    
+    # FIX RÁPIDO: Trazer todas e filtrar aqui se 'mes' não for None?
+    # Ou melhor: atualizar _get_provisoes_agregadas seria ideal, mas está acima.
+    # Vou fazer inline aqui a busca corrigida.
+    
+    ps = ProvisioningService()
+    provs = ps.listar_provisoes(status='PENDENTE', mes=mes) # LISTAR aceita mes
+    
+    df_prov = pd.DataFrame()
+    if provs:
+        df_p = pd.DataFrame(provs)
+        df_prov = df_p.groupby('centro_gasto_codigo').agg({'valor_estimado': 'sum'}).reset_index()
+        df_prov.rename(columns={'valor_estimado': 'provisionado'}, inplace=True)
+    
+    if df_orcado.empty and df_realizado.empty and df_prov.empty:
         return pd.DataFrame()
     
-    # Merge
+    # Merge Orcado + Realizado
     df = df_orcado.merge(
         df_realizado, 
         on=['centro_gasto_codigo', 'ativo'], 
         how='outer'
     )
     
+    # Merge Provisionado
+    if not df_prov.empty:
+        df = df.merge(df_prov, on='centro_gasto_codigo', how='left')
+    else:
+        df['provisionado'] = 0.0
+    
     # Preencher valores nulos
     df['valor_orcado'] = df['valor_orcado'].fillna(0)
     df['valor_realizado'] = df['valor_realizado'].fillna(0)
+    df['provisionado'] = df['provisionado'].fillna(0)
+    df['ativo'] = df['ativo'].fillna('Não Identificado') # Caso venha só de provisão e não tenha ativo mapeado?
+    # Se vier só da provisão, 'ativo' vai ser NaN pois df_prov não tem 'ativo'. 
+    # Precisamos pegar o ativo do df_centros
+    
+    if df['ativo'].isnull().any():
+        df_centros = carregar_centros_gasto()
+        # Map codigo -> ativo
+        mapa = df_centros.set_index('codigo')['ativo'].to_dict()
+        df['ativo'] = df['ativo'].fillna(df['centro_gasto_codigo'].map(mapa))
+
+    
+    df['total_executado'] = df['valor_realizado'] + df['provisionado']
     
     # Calcular desvios
-    df['desvio'] = df['valor_realizado'] - df['valor_orcado']
+    df['desvio'] = df['total_executado'] - df['valor_orcado']
     df['desvio_pct'] = np.where(
         df['valor_orcado'] != 0,
         (df['desvio'] / df['valor_orcado']) * 100,
-        np.where(df['valor_realizado'] != 0, 100, 0)
+        np.where(df['total_executado'] != 0, 100, 0)
     )
     
     # Renomear
@@ -436,36 +515,24 @@ def get_drill_down_ativo(ativo: str, mes: str = None, ano: int = 2026) -> pd.Dat
 # =============================================================================
 
 def get_kpis_gerais(ano: int = 2026) -> Dict:
-    """
-    Calcula KPIs gerais do acompanhamento orçamentário.
-    
-    Returns:
-        Dict com: total_orcado, total_realizado, desvio, desvio_pct, 
-                  execucao_pct, meses_com_dados, status_geral
-    """
+    """Calcula KPIs com base no total executado (Realizado + Provisionado)."""
     df = get_comparativo_mensal(ano)
     
     if df.empty:
-        return {
-            'total_orcado': 0,
-            'total_realizado': 0,
-            'desvio': 0,
-            'desvio_pct': 0,
-            'execucao_pct': 0,
-            'meses_com_dados': 0,
-            'status_geral': 'sem_dados'
-        }
+        return {k: 0 for k in ['total_orcado', 'total_realizado', 'total_provisionado', 'desvio', 'desvio_pct', 'execucao_pct', 'meses_com_dados']} | {'status_geral': 'sem_dados'}
     
     total_orcado = df['orcado'].sum()
     total_realizado = df['realizado'].sum()
-    desvio = total_realizado - total_orcado
+    total_provisionado = df['provisionado'].sum()
+    total_executado = total_realizado + total_provisionado
+    
+    desvio = total_executado - total_orcado
     
     desvio_pct = (desvio / total_orcado * 100) if total_orcado != 0 else 0
-    execucao_pct = (total_realizado / total_orcado * 100) if total_orcado != 0 else 0
+    execucao_pct = (total_executado / total_orcado * 100) if total_orcado != 0 else 0
     
-    meses_com_dados = (df['realizado'] != 0).sum()
+    meses_com_dados = ((df['realizado'] + df['provisionado']) != 0).sum()
     
-    # Determinar status
     if abs(desvio_pct) <= 5:
         status_geral = 'normal'
     elif desvio_pct > 5:
@@ -476,6 +543,7 @@ def get_kpis_gerais(ano: int = 2026) -> Dict:
     return {
         'total_orcado': total_orcado,
         'total_realizado': total_realizado,
+        'total_provisionado': total_provisionado,
         'desvio': desvio,
         'desvio_pct': desvio_pct,
         'execucao_pct': execucao_pct,
@@ -525,13 +593,16 @@ def get_resumo_por_ativo(mes: str = None, ano: int = 2026) -> pd.DataFrame:
     df_agrupado = df.groupby('ativo').agg({
         'orcado': 'sum',
         'realizado': 'sum',
+        'provisionado': 'sum',
         'centro_gasto_codigo': 'count'
     }).reset_index()
     
     df_agrupado = df_agrupado.rename(columns={'centro_gasto_codigo': 'qtd_centros'})
     
-    # Calcular desvios
-    df_agrupado['desvio'] = df_agrupado['realizado'] - df_agrupado['orcado']
+    # Calcular desvios (Total Executado)
+    total_exec = df_agrupado['realizado'] + df_agrupado['provisionado']
+    df_agrupado['desvio'] = total_exec - df_agrupado['orcado']
+    
     df_agrupado['desvio_pct'] = np.where(
         df_agrupado['orcado'] != 0,
         (df_agrupado['desvio'] / df_agrupado['orcado']) * 100,

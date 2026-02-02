@@ -21,6 +21,8 @@ import os
 import pandas as pd
 import numpy as np
 import streamlit as st
+from database.models import RazaoRealizado, get_session, get_engine
+from sqlalchemy import text
 
 # --- Validação de Dados ---
 import pandera as pa
@@ -217,6 +219,61 @@ def processar_upload_completo(uploaded_file, ano: int = None) -> Tuple[pd.DataFr
             if 'fornecedor' not in df_r.columns: df_r['fornecedor'] = 'N/A'
             
             df_razao = df_r
+            
+            # --- PERSISTÊNCIA NA TABELA RAZAO_REALIZADO ---
+            try:
+                if not df_razao.empty:
+                    session = get_session()
+                    try:
+                        # Limpar dados deste ano para evitar duplicação (Shadow Ledger deve espelhar o último upload)
+                        session.query(RazaoRealizado).filter(RazaoRealizado.ano == ano).delete()
+                        
+                        registros = []
+                        # Identificar coluna de data
+                        col_data = next((c for c in df_razao.columns if 'data' in c.lower() or 'dt' in c.lower()), None)
+                        col_historico = next((c for c in df_razao.columns if 'historico' in c.lower() or 'descri' in c.lower()), 'descricao')
+                        col_conta = next((c for c in df_razao.columns if 'conta' in c.lower()), 'conta_contabil')
+
+                        for _, row in df_razao.iterrows():
+                            # Extrair Data e Mês
+                            mes_str = 'N/A'
+                            data_lanc = None
+                            
+                            if col_data and pd.notna(row[col_data]):
+                                try:
+                                    dt = pd.to_datetime(row[col_data], dayfirst=True)
+                                    data_lanc = dt
+                                    # Pega o mês pelo índice (1=JAN, etc)
+                                    mes_idx = dt.month - 1
+                                    if 0 <= mes_idx < 12:
+                                        from utils_financeiro import MESES_ORDEM # Garantir escopo ou usar global
+                                        # MESES_ORDEM já está no modulo, mas por segurança:
+                                        meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
+                                        mes_str = meses[mes_idx]
+                                except: pass
+                            
+                            reg = RazaoRealizado(
+                                ano=ano,
+                                mes=mes_str,
+                                centro_gasto_codigo=str(row.get('codigo_centro_gasto', '')),
+                                conta_contabil_codigo=str(row.get(col_conta, '')),
+                                fornecedor=str(row.get('fornecedor', '')),
+                                descricao=str(row.get(col_historico, '')),
+                                valor=float(row.get('valor', 0)),
+                                data_lancamento=data_lanc
+                            )
+                            registros.append(reg)
+                        
+                        if registros:
+                            session.add_all(registros)
+                            session.commit()
+                    except Exception as e_db:
+                        session.rollback()
+                        print(f"Erro ao salvar Razão no banco: {e_db}")
+                    finally:
+                        session.close()
+            except Exception as e:
+                print(f"Erro geral na persistência do Razão: {e}")
             
         except ValueError:
             # Aba não encontrada, não é erro crítico, apenas retorna vazio

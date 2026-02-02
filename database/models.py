@@ -186,6 +186,41 @@ class LancamentoRealizado(Base):
         )
 
 
+class RazaoRealizado(Base):
+    """
+    Tabela para armazenar o Razão de Gastos (detalhado) vindo do P&L.
+    Permite auditoria cruzada com Provisões.
+    """
+    __tablename__ = 'razao_realizados'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ano = Column(Integer, nullable=False, index=True)
+    mes = Column(String(3), nullable=False, index=True)
+    centro_gasto_codigo = Column(String(11), nullable=False, index=True)
+    conta_contabil_codigo = Column(String(15), nullable=False, index=True)
+    fornecedor = Column(String(200))
+    descricao = Column(Text)
+    valor = Column(Float, nullable=False)
+    data_lancamento = Column(DateTime)
+    numero_registro = Column(String(50))
+
+    # Metadados de carga
+    data_carga = Column(DateTime, default=datetime.now)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ano': self.ano,
+            'mes': self.mes,
+            'centro': self.centro_gasto_codigo,
+            'conta': self.conta_contabil_codigo,
+            'fornecedor': self.fornecedor,
+            'descricao': self.descricao,
+            'valor': self.valor,
+            'data_lancamento': self.data_lancamento.isoformat() if self.data_lancamento else None
+        }
+
+
 # =============================================================================
 # NOVOS MODELOS (FASES 5-7)
 # =============================================================================

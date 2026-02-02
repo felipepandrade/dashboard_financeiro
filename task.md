@@ -12,6 +12,14 @@
 - [x] Scripts de carga de referência (`referencias_manager.py`)
 - [x] Utilitários de processamento (`utils_financeiro.py`)
 
+## ✅ Fase 2.1: Conciliação de Dados (Shadow Ledger)
+
+- [x] **Database**: Criar tabela `RazaoRealizado` (Auditoria e Conciliação)
+- [x] **Backend**: Atualizar `ProvisioningService` (Edição e Status)
+- [x] **UI**: Funcionalidades de Edição e Exportação em `02_📝_Lancamentos.py`
+- [x] **Dashboard**: Visualização Empilhada (Realizado + Provisionado)
+- [x] **ETL**: Carga automática do Razão via upload de P&L
+
 ## ✅ Fase 3: Módulo de Lançamentos
 
 - [x] Formulário de input mensal (`02_📝_Lancamentos.py`)
@@ -102,3 +110,19 @@
   - [ ] Restaurar funcionalidade de "Análise de Fornecedores" (Incluir carga da aba 'Razão_Gastos' no upload do P&L)
   - [ ] Review de Código: Melhorar nomes, performance e tipagem
   - [ ] UI/UX Review: Aplicar estilo Premium e simplificar navegação
+
+## 🚀 Fase 11: Deploy e Infraestrutura (Novo)
+
+- [x] **Pesquisa de Opções**:
+  - [x] Analisar Free Tier Permanente (Streamlit Cloud, Render, Oracle Cloud)
+  - [x] Pesquisar Banco de Dados Externo (Neon, Supabase)
+  - [x] Gerar Relatório de Opções (`deployment_options.md`)
+- [ ] **Decisão de Arquitetura**:
+  - [ ] Selecionar combo (Ex: Streamlit Cloud + Neon)
+- [ ] **Preparação para Deploy**:
+  - [ ] Migrar SQLite para Postgres (Scripts de exportação/importação)
+  - [ ] Configurar variáveis de ambiente (`secrets.toml`)
+  - [ ] Criar arquivo `packages.txt` (se necessário)
+- [ ] **Deploy**:
+  - [ ] Configurar conexão GitHub
+  - [ ] Deploy em Produção
