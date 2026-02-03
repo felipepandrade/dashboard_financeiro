@@ -10,14 +10,16 @@ from alembic import context
 # Add project root to python path to import models
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from database.models import Base, DATABASE_PATH
+from database.models import Base, get_engine
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# Overwrite sqlalchemy.url with the path from models.py to ensure consistency
-config.set_main_option("sqlalchemy.url", f"sqlite:///{DATABASE_PATH}")
+# Overwrite sqlalchemy.url with the path from models.py logic
+# This ensures Alembic uses Postgres if DATABASE_URL is set, or SQLite otherwise
+db_url = str(get_engine().url)
+config.set_main_option("sqlalchemy.url", db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

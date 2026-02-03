@@ -13,7 +13,8 @@ scikit-learn
 sqlalchemy
 watchdog
 altair
-playwright
 nest_asyncio
 requests
 bcrypt
+psycopg2-binary
+python-dotenv

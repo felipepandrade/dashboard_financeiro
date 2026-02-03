@@ -7,12 +7,19 @@ from utils_financeiro import (
     get_resumo_importacao
 )
 from utils_ui import setup_page, exibir_kpi_card, formatar_valor_brl, require_auth
+from database.models import init_db
 
 # =============================================================================
 # CONFIGURAÇÃO INICIAL
 # =============================================================================
 
 setup_page("Home - Baseal Planejamento", "🏠")
+
+# Garantir que o banco de dados (tabelas) exista
+try:
+    init_db()
+except Exception as e:
+    st.error(f"Erro ao inicializar banco de dados: {e}")
 require_auth()
 
 # =============================================================================

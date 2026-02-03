@@ -27,7 +27,15 @@ from sqlalchemy.orm import sessionmaker
 # CONFIGURAÇÃO DO BANCO
 # =============================================================================
 
-# Diretório do banco de dados
+import os
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente (.env) se existirem
+load_dotenv()
+
+# ... (imports anteriores se mantêm, mas vou substituir o bloco de config)
+
+# Diretório do banco de dados (Fallback SQLite)
 DATABASE_DIR = Path(__file__).parent.parent / "data" / "database"
 DATABASE_PATH = DATABASE_DIR / "lancamentos_2026.db"
 
@@ -37,22 +45,43 @@ Base = declarative_base()
 
 def get_engine():
     """
-    Retorna o engine SQLAlchemy para o banco SQLite.
-    
-    Returns:
-        Engine SQLAlchemy configurado
+    Retorna o engine SQLAlchemy.
+    Prioriza DATABASE_URL (Env ou Secrets).
+    Caso contrário, usa SQLite local.
     """
-    # Garantir que o diretório existe
-    DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+    db_url = os.getenv("DATABASE_URL")
     
-    # Conexão SQLite
-    connection_string = f"sqlite:///{DATABASE_PATH}"
-    
-    return create_engine(
-        connection_string,
-        echo=False,  # Mudar para True para debug de SQL
-        connect_args={"check_same_thread": False}  # Necessário para SQLite + Streamlit
-    )
+    # Tentativa de fallback para Streamlit Secrets (Cloud)
+    if not db_url:
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets") and "DATABASE_URL" in st.secrets:
+                db_url = st.secrets["DATABASE_URL"]
+        except Exception:
+            pass # Ignora erros de importação ou contexto fora do Streamlit
+
+    if db_url:
+        # Configuração para Postgres (Neon/Production)
+        # Substitui 'postgres://' por 'postgresql://' caso venha errado
+        if db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql://", 1)
+            
+        return create_engine(
+            db_url,
+            echo=False,
+            pool_pre_ping=True, # Evita desconexões silenciosas
+            pool_recycle=300    # Renova conexões a cada 5 min
+        )
+    else:
+        # Configuração para SQLite (Local/Fallback)
+        DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+        connection_string = f"sqlite:///{DATABASE_PATH}"
+        
+        return create_engine(
+            connection_string,
+            echo=False,
+            connect_args={"check_same_thread": False}
+        )
 
 
 def get_session():
