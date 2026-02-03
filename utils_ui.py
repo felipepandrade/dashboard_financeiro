@@ -94,6 +94,7 @@ def render_login_screen():
                 if not username or not password:
                     st.warning("⚠️ Preencha todos os campos.")
                 else:
+                    user = AuthService.verify_user(username, password)
                     if user:
                         st.session_state['authenticated'] = True
                         st.session_state['username'] = user.username
