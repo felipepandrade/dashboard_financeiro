@@ -1,6 +1,6 @@
 pandas
 numpy
-streamlit
+streamlit>=1.40.0
 plotly
 openpyxl
 pandera
@@ -12,7 +12,7 @@ alembic
 scikit-learn
 sqlalchemy
 watchdog
-altair
+altair<6.0.0
 nest_asyncio
 requests
 bcrypt
