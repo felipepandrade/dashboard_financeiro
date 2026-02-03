@@ -6,14 +6,13 @@ from utils_financeiro import (
     processar_upload_pl,
     get_resumo_importacao
 )
-from utils_ui import setup_page, exibir_kpi_card, formatar_valor_brl, require_auth
+from utils_ui import setup_page, exibir_kpi_card, formatar_valor_brl
 
 # =============================================================================
 # CONFIGURAÇÃO INICIAL
 # =============================================================================
 
 setup_page("Home - Baseal Planejamento", "🏠")
-require_auth()
 
 # =============================================================================
 # HEADER

@@ -16,13 +16,14 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from database.models import get_session, LancamentoRealizado, Provisao, Remanejamento, ForecastCenario, DATABASE_PATH
-from utils_ui import setup_page, CORES
+from utils_ui import setup_page, CORES, require_auth
 
 # =============================================================================
 # CONFIGURAÇÃO
 # =============================================================================
 
 setup_page("Gestão de Dados", "⚙️")
+require_auth("admin")
 
 if 'admin_mode' not in st.session_state:
     st.session_state['admin_mode'] = False

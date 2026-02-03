@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "notebooklm": {
+      "command": "c:\\users\\wn6241\\appdata\\local\\programs\\python\\python311\\scripts\\notebooklm-mcp.exe",
+      "args": [],
+      "env": {}
+    }
+  }
+}

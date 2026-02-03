@@ -21,7 +21,8 @@ from utils_ui import (
     setup_page,
     exibir_kpi_card,
     formatar_valor_brl,
-    CORES
+    CORES,
+    require_auth
 )
 
 # =============================================================================
@@ -29,6 +30,7 @@ from utils_ui import (
 # =============================================================================
 
 setup_page("Análise Financeira", "📊")
+require_auth()
 
 # =============================================================================
 # VERIFICAR DADOS NA SESSÃO

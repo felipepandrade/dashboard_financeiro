@@ -11,13 +11,14 @@ from data.referencias_manager import (
     MAPA_CLASSES,
     MESES_ORDEM
 )
-from utils_ui import setup_page, formatar_valor_brl
+from utils_ui import setup_page, formatar_valor_brl, require_auth
 
 # =============================================================================
 # CONFIGURAÇÃO
 # =============================================================================
 
 setup_page("Gestão de Compromissos", "📝")
+require_auth()
 
 st.markdown("""
 <div style="text-align: center; padding: 20px 0;">

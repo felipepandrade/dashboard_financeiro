@@ -8,7 +8,7 @@ Permite explorar o Orçamento Base 2026, Histórico Realizado e Metadados (Centr
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from utils_ui import setup_page, exibir_kpi_card, formatar_valor_brl, CORES
+from utils_ui import setup_page, exibir_kpi_card, formatar_valor_brl, CORES, require_auth
 from data.referencias_manager import (
     carregar_orcamento_v1_2026,
     carregar_centros_gasto,
@@ -21,6 +21,7 @@ from data.referencias_manager import (
 # =============================================================================
 
 setup_page("Bíblia Financeira - Dados Mestres", "📚")
+require_auth()
 
 st.markdown("""
 <div class="section-header">

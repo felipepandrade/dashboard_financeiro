@@ -380,3 +380,30 @@ class JustificativaOBZ(Base):
             'usuario_responsavel': self.usuario_responsavel,
             'data_atualizacao': self.data_atualizacao.isoformat() if self.data_atualizacao else None
         }
+
+# =============================================================================
+# MODELO DE AUTENTICAÇÃO (Fase Segurança)
+# =============================================================================
+
+class User(Base):
+    """
+    Tabela de Usuários para controle de acesso (RBAC).
+    """
+    __tablename__ = 'users'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    name = Column(String(100))
+    role = Column(String(20), default='viewer', nullable=False) # admin, editor, viewer
+    created_at = Column(DateTime, default=datetime.now)
+    last_login = Column(DateTime)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'username': self.username,
+            'name': self.name,
+            'role': self.role,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

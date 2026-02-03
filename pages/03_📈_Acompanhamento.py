@@ -49,7 +49,8 @@ from utils_ui import (
     setup_page, 
     formatar_valor_brl, 
     exibir_kpi_card, 
-    CORES
+    CORES,
+    require_auth
 )
 
 # =============================================================================
@@ -57,6 +58,7 @@ from utils_ui import (
 # =============================================================================
 
 setup_page("Acompanhamento Orçamentário - 2026", "📈")
+require_auth()
 
 # =============================================================================
 # ESTILOS ADICIONAIS

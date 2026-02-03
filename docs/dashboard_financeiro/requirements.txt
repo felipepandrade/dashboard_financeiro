@@ -16,4 +16,3 @@ altair
 playwright
 nest_asyncio
 requests
-bcrypt

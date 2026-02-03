@@ -14,10 +14,11 @@ from services.ai_board import AIBoard
 from services.provisioning_service import ProvisioningService
 from data.comparador import get_comparativo_mensal, get_realizado_agregado_por_mes
 
-from utils_ui import setup_page
+from utils_ui import setup_page, require_auth
 
 # Configuração da Página
 setup_page("Previsão e Inteligência - 2026", "🔮")
+require_auth()
 
 # CSS Personalizado Adicional (específico desta página)
 st.markdown("""

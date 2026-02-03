@@ -3,13 +3,14 @@ import pandas as pd
 from datetime import datetime
 from services.budget_control import BudgetControlService
 from data.referencias_manager import carregar_centros_gasto, MESES_ORDEM
-from utils_ui import setup_page, formatar_valor_brl
+from utils_ui import setup_page, formatar_valor_brl, require_auth
 
 # =============================================================================
 # CONFIGURAÇÃO
 # =============================================================================
 
 setup_page("Controle Orçamentário", "🧱")
+require_auth()
 
 st.markdown("""
 <div style="text-align: center; padding: 20px 0;">
