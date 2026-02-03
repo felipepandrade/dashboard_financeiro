@@ -10,7 +10,7 @@ from utils_ui import setup_page, formatar_valor_brl, require_auth
 # =============================================================================
 
 setup_page("Controle Orçamentário", "🧱")
-require_auth()
+require_auth(module='controle')
 
 st.markdown("""
 <div style="text-align: center; padding: 20px 0;">

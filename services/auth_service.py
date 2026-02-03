@@ -1,5 +1,6 @@
 
 import bcrypt
+import json
 from sqlalchemy.orm import Session
 from database.models import User, get_session
 import streamlit as st
@@ -58,9 +59,13 @@ class AuthService:
             session.close()
 
     @staticmethod
-    def check_permission(required_role: str) -> bool:
+    def check_permission(required_role: str, module_key: str = None) -> bool:
         """
-        Verifica se o usuário atual tem permissão baseada em hierarquia de roles.
+        Verifica se o usuário atual tem permissão.
+        1. Se module_key for informado, checa a permissão específica naquele módulo (JSON).
+           Se não houver definição específica, fallback para a role global.
+        2. Se apenas required_role for informado, checa a role global.
+        
         Hierarquia: admin > editor > viewer
         """
         if 'user_role' not in st.session_state or not st.session_state['user_role']:
@@ -72,13 +77,40 @@ class AuthService:
         levels = {
             'admin': 3,
             'editor': 2,
-            'viewer': 1
+            'viewer': 1,
+            'none': 0
         }
         
-        user_level = levels.get(current_role, 0)
-        required_level = levels.get(required_role, 99) # Se role desconhecida, bloqueia
+        # Nível global do usuário
+        user_global_level = levels.get(current_role, 0)
         
-        return user_level >= required_level
+        # 1. Super-Admin Global tem acesso a tudo (exceto se explicitamente bloqueado? Não, admin é deus)
+        if user_global_level >= 3:
+            return True
+        
+        # 2. Verifica permissão específica do módulo, se solicitada
+        if module_key:
+            permissions_json = st.session_state.get('user_permissions', '{}') # Use chave correta da sessão
+            try:
+                if isinstance(permissions_json, str):
+                    permissions = json.loads(permissions_json)
+                else:
+                    permissions = permissions_json if isinstance(permissions_json, dict) else {}
+                
+                module_role = permissions.get(module_key)
+                
+                # Se houver uma definição específica para o módulo, usa ela
+                if module_role:
+                    user_module_level = levels.get(module_role, 0)
+                    required_level = levels.get(required_role, 99)
+                    return user_module_level >= required_level
+                    
+            except Exception:
+                pass # Ignora erro de parse, usa global
+        
+        # Fallback: Validação pela Role Global
+        required_level = levels.get(required_role, 99)
+        return user_global_level >= required_level
 
     # =========================================================================
     # USER MANAGEMENT METHODS (CRUD)
@@ -107,7 +139,8 @@ class AuthService:
                 username=username,
                 password_hash=hashed,
                 name=name,
-                role=role
+                role=role,
+                permissions='{}' # Default empty JSON
             )
             session.add(new_user)
             session.commit()
@@ -126,7 +159,6 @@ class AuthService:
             if not user:
                 return False, "Usuário não encontrado"
             
-            # Impedir auto-deleção do user logado (opcional, mas boa prática de UI) ou admin principal
             if username == 'admin':
                  return False, "Não é possível remover o super-admin."
 
@@ -152,5 +184,33 @@ class AuthService:
             return True, "Senha atualizada com sucesso!"
         except Exception as e:
             return False, f"Erro ao atualizar senha: {e}"
+        finally:
+            session.close()
+
+    @staticmethod
+    def update_user(username, name=None, role=None, permissions=None):
+        """Atualiza dados cadastrais e permissões de um usuário."""
+        session = get_session()
+        try:
+            user = session.query(User).filter(User.username == username).first()
+            if not user:
+                return False, "Usuário não encontrado"
+            
+            if username == 'admin' and role != 'admin':
+                return False, "Não é possível rebaixar o super-admin."
+
+            if name: user.name = name
+            if role: user.role = role
+            
+            if permissions is not None:
+                if isinstance(permissions, dict):
+                    user.permissions = json.dumps(permissions)
+                else:
+                    user.permissions = str(permissions)
+
+            session.commit()
+            return True, "Dados atualizados com sucesso!"
+        except Exception as e:
+            return False, f"Erro ao atualizar dados: {e}"
         finally:
             session.close()

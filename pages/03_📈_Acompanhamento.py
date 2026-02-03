@@ -58,7 +58,7 @@ from utils_ui import (
 # =============================================================================
 
 setup_page("Acompanhamento Orçamentário - 2026", "📈")
-require_auth()
+require_auth(module='acompanhamento')
 
 # =============================================================================
 # ESTILOS ADICIONAIS

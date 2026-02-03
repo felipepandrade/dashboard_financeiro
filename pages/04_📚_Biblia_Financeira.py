@@ -21,7 +21,7 @@ from data.referencias_manager import (
 # =============================================================================
 
 setup_page("Bíblia Financeira - Dados Mestres", "📚")
-require_auth()
+require_auth(module='biblia')
 
 st.markdown("""
 <div class="section-header">

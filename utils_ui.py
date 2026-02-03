@@ -6,14 +6,13 @@ from services.auth_service import AuthService
 # CONTROLE DE ACESSO (Login)
 # =============================================================================
 
-def require_auth(required_role: str = None):
+def require_auth(required_role: str = None, module: str = None):
     """
-    Verifica se o usuário está autenticado.
-    Se não, exibe tela de login e interrompe o script (st.stop()).
-    Se sim, verifica permissão (se required_role for informado).
+    Verifica se o usuário está autenticado e tem permissão.
     
     Args:
-        required_role: Role mínima para acessar (viewer, editor, admin)
+        required_role: Role mínima (viewer, editor, admin)
+        module: Nome do módulo para permissão granular (opcional)
     """
     
     # 1. Verifica se já está logado
@@ -24,22 +23,26 @@ def require_auth(required_role: str = None):
         render_login_screen()
         st.stop() # Impede que o resto da página carregue
         
-    # 2. Verifica permissão (RBAC)
+    # 2. Verifica permissão (RBAC + Granular)
     if required_role:
-        if not AuthService.check_permission(required_role):
-            st.error("⛔ Acesso Negado: Você não tem permissão para acessar este módulo.")
+        # Passa 'module' como 'module_key'
+        if not AuthService.check_permission(required_role, module_key=module):
+            st.error(f"⛔ Acesso Negado: Você não tem permissão de nível '{required_role.upper()}' para acessar este módulo.")
             st.stop()
             
     # 3. Sidebar com Infos do Usuário
     with st.sidebar:
         st.markdown("---")
         st.markdown(f"**👤 Usuário:** {st.session_state.get('name', 'User')}")
-        st.markdown(f"**🔑 Perfil:** {st.session_state.get('user_role', 'viewer').upper()}")
+        
+        role = st.session_state.get('user_role', 'viewer')
+        st.markdown(f"**🔑 Perfil Global:** {role.upper()}")
         
         if st.button("🚪 Sair (Logout)"):
-            st.session_state['authenticated'] = False
-            st.session_state['user_role'] = None
-            st.session_state['username'] = None
+            keys_to_clear = ['authenticated', 'user_role', 'username', 'name', 'user_permissions']
+            for key in keys_to_clear:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.rerun()
 
 def render_login_screen():
@@ -91,12 +94,12 @@ def render_login_screen():
                 if not username or not password:
                     st.warning("⚠️ Preencha todos os campos.")
                 else:
-                    user = AuthService.verify_user(username, password)
                     if user:
                         st.session_state['authenticated'] = True
                         st.session_state['username'] = user.username
                         st.session_state['name'] = user.name
                         st.session_state['user_role'] = user.role
+                        st.session_state['user_permissions'] = user.permissions # Load permissions
                         st.success(f"Bem-vindo, {user.name}!")
                         time.sleep(1)
                         st.rerun()

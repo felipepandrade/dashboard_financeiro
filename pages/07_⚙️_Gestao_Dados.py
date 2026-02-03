@@ -23,7 +23,7 @@ from utils_ui import setup_page, CORES, require_auth
 # =============================================================================
 
 setup_page("Gestão de Dados", "⚙️")
-require_auth("admin")
+require_auth("admin", module='dados')
 
 if 'admin_mode' not in st.session_state:
     st.session_state['admin_mode'] = False

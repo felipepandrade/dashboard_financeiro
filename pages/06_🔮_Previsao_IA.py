@@ -18,7 +18,7 @@ from utils_ui import setup_page, require_auth
 
 # Configuração da Página
 setup_page("Previsão e Inteligência - 2026", "🔮")
-require_auth()
+require_auth(module='previsao')
 
 # CSS Personalizado Adicional (específico desta página)
 st.markdown("""

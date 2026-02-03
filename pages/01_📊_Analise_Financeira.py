@@ -30,7 +30,7 @@ from utils_ui import (
 # =============================================================================
 
 setup_page("Análise Financeira", "📊")
-require_auth()
+require_auth(module='analise_financeira')
 
 # =============================================================================
 # VERIFICAR DADOS NA SESSÃO

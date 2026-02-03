@@ -395,6 +395,9 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     name = Column(String(100))
+    # RBAC Granular: JSON as String (Ex: '{"financeiro": "editor", "admin": "viewer"}')
+    permissions = Column(Text, default='{}') 
+    
     role = Column(String(20), default='viewer', nullable=False) # admin, editor, viewer
     created_at = Column(DateTime, default=datetime.now)
     last_login = Column(DateTime)
@@ -405,5 +408,6 @@ class User(Base):
             'username': self.username,
             'name': self.name,
             'role': self.role,
+            'permissions': self.permissions,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
