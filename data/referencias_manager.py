@@ -141,10 +141,18 @@ def carregar_centros_gasto() -> pd.DataFrame:
         df['is_sem_hierarquia'] = df['ATIVO'].isin(ATIVOS_SEM_HIERARQUIA)
         
         # Renomear colunas para padronização
-        df = df.rename(columns={
+        # Assumindo que o Excel novo tem colunas 'REGIONAL' e 'BASE'
+        rename_map = {
             'DESCRIÇÃO CENTRO DE GASTO': 'descricao',
-            'ATIVO': 'ativo'
-        })
+            'ATIVO': 'ativo',
+            'REGIONAL': 'regional',
+            'BASE': 'base'
+        }
+        df = df.rename(columns=rename_map)
+        
+        # Garantir que colunas existam mesmo se o Excel não tiver (fail-safe)
+        if 'regional' not in df.columns: df['regional'] = None
+        if 'base' not in df.columns: df['base'] = None
         
         return df
         
@@ -408,19 +416,10 @@ def validar_conta_contabil(codigo: str, df_contas: pd.DataFrame = None) -> Tuple
 
 def buscar_centros_gasto(termo: str = "", ativo: str = None, 
                          classe: str = None, excluir_cos: bool = False,
+                         regional: str = None, base: str = None,
                          df_centros: pd.DataFrame = None) -> pd.DataFrame:
     """
     Busca centros de gasto com filtros opcionais.
-    
-    Args:
-        termo: Termo para buscar no código ou descrição
-        ativo: Filtrar por ativo específico
-        classe: Filtrar por classe específica
-        excluir_cos: Se True, exclui centros administrativos (COS)
-        df_centros: DataFrame de centros
-    
-    Returns:
-        DataFrame filtrado com centros de gasto
     """
     if df_centros is None:
         df_centros = carregar_centros_gasto()
@@ -442,6 +441,14 @@ def buscar_centros_gasto(termo: str = "", ativo: str = None,
     # Filtrar por classe
     if classe:
         resultado = resultado[resultado['classe'] == str(classe)]
+
+    # Filtrar por Regional
+    if regional:
+        resultado = resultado[resultado['regional'] == regional]
+
+    # Filtrar por Base
+    if base:
+        resultado = resultado[resultado['base'] == base]
     
     # Excluir COS se solicitado
     if excluir_cos:

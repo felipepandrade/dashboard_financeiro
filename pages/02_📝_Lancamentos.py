@@ -103,12 +103,33 @@ with tab_novo:
             mes = st.selectbox("Mês Competência", MESES_ORDEM)
         
         with col_b2:
-            # Selectbox inteligente para centros
-            opcoes_centros = []
-            if not df_centros.empty:
-                opcoes_centros = df_centros.apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1).tolist()
+            st.markdown("**Localização & Centro**")
             
-            centro_sel = st.selectbox("Centro de Custo", options=opcoes_centros, placeholder="Selecione...", index=None)
+            # --- Filtro em Cascata para Centro de Custo ---
+            
+            # 1. Filtro de Regional (Se disponível)
+            regionais = sorted(df_centros['regional'].dropna().unique().tolist()) if 'regional' in df_centros.columns else []
+            sel_regional = st.selectbox("1. Regional", options=["Todas"] + regionais, index=0)
+            
+            # 2. Filtro de Base (Depende da Regional)
+            df_bases_filtradas = df_centros.copy()
+            if sel_regional != "Todas":
+                df_bases_filtradas = df_bases_filtradas[df_bases_filtradas['regional'] == sel_regional]
+                
+            bases = sorted(df_bases_filtradas['base'].dropna().unique().tolist()) if 'base' in df_bases_filtradas.columns else []
+            sel_base = st.selectbox("2. Base", options=["Todas"] + bases, index=0)
+            
+            # 3. Filtro de Centro (Depende da Base)
+            df_centros_final = df_bases_filtradas.copy()
+            if sel_base != "Todas":
+                df_centros_final = df_centros_final[df_centros_final['base'] == sel_base]
+            
+            # Populando o Selectbox final
+            opcoes_centros = []
+            if not df_centros_final.empty:
+                opcoes_centros = df_centros_final.sort_values(['codigo']).apply(lambda x: f"{x['codigo']} - {x['descricao']}", axis=1).tolist()
+            
+            centro_sel = st.selectbox("3. Centro de Custo", options=opcoes_centros, placeholder="Selecione o centro...", index=None)
 
         with col_b3:
             # Selectbox inteligente para contas
@@ -166,7 +187,10 @@ with tab_novo:
                         # Novos Campos
                         "numero_contrato": num_contrato,
                         "cadastrado_sistema": True if cadastrado_sis == "Sim" else False,
-                        "numero_registro": num_registro
+                        "numero_registro": num_registro,
+                        # Novos campos de hierarquia
+                        "regional": df_centros.loc[df_centros['codigo'] == centro_sel.split(' - ')[0], 'regional'].values[0] if 'regional' in df_centros.columns else None,
+                        "base": df_centros.loc[df_centros['codigo'] == centro_sel.split(' - ')[0], 'base'].values[0] if 'base' in df_centros.columns else None
                     }
                     prov_service.criar_provisao(dados)
                     st.session_state.sucesso_prov = "✅ Provisão registrada com sucesso!"

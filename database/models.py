@@ -136,6 +136,10 @@ class LancamentoRealizado(Base):
     is_ga = Column(Boolean, default=False)  # True se custo de suporte (G&A)
     is_sem_hierarquia = Column(Boolean, default=False)  # True se COS ou G&A (não segue hierarquia pai-filho)
     
+    # Hierarquia Geográfica/Operacional (Adicionado Fev/2026)
+    regional = Column(String(50), index=True, nullable=True)
+    base = Column(String(50), index=True, nullable=True)
+    
     # Conta Contábil
     conta_contabil_codigo = Column(String(15), nullable=False, index=True)
     conta_contabil_descricao = Column(String(200))
@@ -179,6 +183,8 @@ class LancamentoRealizado(Base):
             'is_cos': self.is_cos,
             'is_ga': self.is_ga,
             'is_sem_hierarquia': self.is_sem_hierarquia,
+            'regional': self.regional,
+            'base': self.base,
             'conta_contabil_codigo': self.conta_contabil_codigo,
             'conta_contabil_descricao': self.conta_contabil_descricao,
             'fornecedor': self.fornecedor,
@@ -205,6 +211,8 @@ class LancamentoRealizado(Base):
             is_cos=data.get('is_cos', False),
             is_ga=data.get('is_ga', False),
             is_sem_hierarquia=data.get('is_sem_hierarquia', False),
+            regional=data.get('regional', None),
+            base=data.get('base', None),
             conta_contabil_codigo=data.get('conta_contabil_codigo', ''),
             conta_contabil_descricao=data.get('conta_contabil_descricao', ''),
             fornecedor=data.get('fornecedor', ''),
@@ -317,6 +325,10 @@ class Provisao(Base):
     justificativa_obz = Column(Text)
     tipo_despesa = Column(String(20), default='Variavel') # Core, Nice-to-have, etc.
     
+    # Hierarquia Geográfica (Adicionado Fev/2026)
+    regional = Column(String(50), nullable=True)
+    base = Column(String(50), nullable=True)
+    
     # Novos Campos (Fase 8.3)
     numero_contrato = Column(String(50), nullable=True)
     cadastrado_sistema = Column(Boolean, default=False)
@@ -341,7 +353,11 @@ class Provisao(Base):
             'justificativa_obz': self.justificativa_obz,
             'numero_contrato': self.numero_contrato,
             'cadastrado_sistema': self.cadastrado_sistema,
-            'numero_registro': self.numero_registro
+            'numero_contrato': self.numero_contrato,
+            'cadastrado_sistema': self.cadastrado_sistema,
+            'numero_registro': self.numero_registro,
+            'regional': self.regional,
+            'base': self.base
         }
 
 class Remanejamento(Base):
