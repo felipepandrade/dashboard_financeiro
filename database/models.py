@@ -96,6 +96,9 @@ def get_session():
     return Session()
 
 
+import streamlit as st
+
+@st.cache_resource
 def init_db():
     """
     Inicializa o banco de dados.

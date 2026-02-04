@@ -224,6 +224,14 @@ def setup_page(title: str, icon: str = "📊", layout: str = "wide"):
         layout=layout,
         initial_sidebar_state="expanded"
     )
+    from database.models import init_db
+    
+    # Garantir que o banco de dados (tabelas) exista (Executa apenas 1x devido ao cache)
+    try:
+        init_db()
+    except Exception as e:
+        st.error(f"Erro Crítico ao conectar no Banco de Dados: {e}")
+        
     aplicar_estilo_premium()
     
     # -------------------------------------------------------------------------
