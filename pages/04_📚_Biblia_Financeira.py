@@ -100,17 +100,53 @@ def load_pl_from_db():
 
 df_orc_base, df_centros_base, df_contas_base = load_static_data()
 
-# Dados de Sessão (Realizado/Histórico)
-pl_df_session = st.session_state.get('pl_df')
+df_orc_base, df_centros_base, df_contas_base = load_static_data()
 
-# Fallback: Se não tem na sessão, tenta carregar do banco (Histórico Persistido)
-if pl_df_session is None or pl_df_session.empty:
-    with st.spinner("Carregando histórico financeiro do banco de dados..."):
-        pl_df_db = load_pl_from_db()
-        if not pl_df_db.empty:
-            st.session_state['pl_df'] = pl_df_db
-            pl_df_session = pl_df_db
-            # st.toast("Histórico carregado do banco de dados!", icon="💾")
+# =============================================================================
+# UNIFICAÇÃO DE DADOS (DB + Session)
+# =============================================================================
+
+@st.cache_data(ttl=600, show_spinner="Carregando histórico unificado...")
+def get_unified_history():
+    """Retorna DF unificado do Banco (2024/25) e Session (Upload Atual)."""
+    # 1. Carrega do Banco
+    df_db = load_pl_from_db()
+    if not df_db.empty:
+        df_db['origem_dado'] = 'Banco de Dados (Persistido)'
+    
+    return df_db
+
+# 1. Dados Persistidos
+pl_df_db = get_unified_history()
+
+# 2. Dados da Sessão (Uploads recentes)
+pl_df_session = st.session_state.get('pl_df')
+if pl_df_session is not None and not pl_df_session.empty:
+    pl_df_session = pl_df_session.copy()
+    pl_df_session['origem_dado'] = 'Sessão Atual (Upload)'
+
+# 3. Merge Inteligente
+# Prioridade: Sessão > Banco (para anos que coincidem, assumimos que o upload é mais novo)
+# Mas o usuário pediu para carregar 2024/2025 no banco. Se ele subir 2025 de novo, usa sessão.
+if pl_df_session is not None and not pl_df_session.empty:
+    if not pl_df_db.empty:
+        # Se temos ambos, concatenamos.
+        # Estratégia simples: Concatenar tudo. O filtro de ano resolverá a visualização.
+        # (Opcional: Remover do DB se ano existir na sessão? Por enquanto, mantemos tudo)
+        # Melhor: Se ano X está na sessão, remove X do DB para não duplicar na visualização.
+        
+        anos_sessao = pl_df_session['ano'].unique()
+        df_db_filtered = pl_df_db[~pl_df_db['ano'].isin(anos_sessao)]
+        
+        pl_df_final = pd.concat([df_db_filtered, pl_df_session], ignore_index=True)
+    else:
+        pl_df_final = pl_df_session
+else:
+    pl_df_final = pl_df_db
+
+# Salvar no contexto local para visualização
+df_hist_view = pl_df_final
+
 
 # =============================================================================
 # TABS PRINCIPAIS
@@ -189,30 +225,30 @@ with tab_orc:
 with tab_hist:
     st.markdown("### 🕰️ Histórico Realizado (P&L)")
     
-    if pl_df_session is not None and not pl_df_session.empty:
-        # st.info("Visualizando dados carregados na sessão atual.") # Remover info redundante
-        
+    st.markdown("### 🕰️ Histórico Realizado (P&L)")
+    
+    if df_hist_view is not None and not df_hist_view.empty:
         # Filtro de Ano
-        anos_disponiveis = sorted(pl_df_session['ano'].unique().tolist()) if 'ano' in pl_df_session.columns else []
+        anos_disponiveis = sorted(df_hist_view['ano'].unique().tolist()) if 'ano' in df_hist_view.columns else []
         anos_selecionados = st.multiselect("📅 Filtrar Anos", anos_disponiveis, default=anos_disponiveis)
         
         if anos_selecionados:
-            df_hist_view = pl_df_session[pl_df_session['ano'].isin(anos_selecionados)]
+            df_table = df_hist_view[df_hist_view['ano'].isin(anos_selecionados)]
         else:
-            df_hist_view = pl_df_session
+            df_table = df_hist_view
             
         # Resumo KPI
-        meses_hist = df_hist_view['mes'].nunique() if 'mes' in df_hist_view.columns else 0
-        total_hist = df_hist_view.query("tipo_valor == 'Realizado'")['valor'].sum()
+        meses_hist = df_table['mes'].nunique() if 'mes' in df_table.columns else 0
+        total_hist = df_table.query("tipo_valor == 'Realizado'")['valor'].sum()
         
         c1, c2, c3 = st.columns(3)
         with c1: exibir_kpi_card("Total Realizado", formatar_valor_brl(total_hist), f"Anos: {anos_selecionados}")
         with c2: exibir_kpi_card("Meses Carregados", str(meses_hist), "Meses Fechados")
-        with c3: exibir_kpi_card("Registros", f"{len(df_hist_view):,}", "Linhas P&L")
+        with c3: exibir_kpi_card("Registros", f"{len(df_table):,}", "Linhas P&L")
         
         st.divider()
         
-        st.dataframe(df_hist_view, use_container_width=True, height=500)
+        st.dataframe(df_table, use_container_width=True, height=500)
         
     else:
         st.warning("⚠️ Nenhum histórico carregado na sessão.")
