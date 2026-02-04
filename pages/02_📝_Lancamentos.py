@@ -273,24 +273,35 @@ with tab_import:
                 # Converter para lista de dicts
                 lista_dados = df_import.to_dict(orient='records')
 
-                # --- ENRIQUECIMENTO AUTOMÁTICO (Regional e Base) ---
-                # A partir do centro de custo, buscamos a regional e base correspondentes
+                # --- ENRIQUECIMENTO AUTOMÁTICO (Regional, Base, Usuário, Valor) ---
+                current_user = st.session_state.get('username', 'Importação em Lote')
+
                 if not df_centros.empty and 'regional' in df_centros.columns:
                     for item in lista_dados:
                         try:
-                            # Normalizar código (pode vir como int do Excel)
+                            # 1. Atribuição de Usuário
+                            item['usuario'] = current_user
+
+                            # 2. Forçar Valor Negativo (Gasto)
+                            val_raw = float(item.get('valor_estimado', 0))
+                            item['valor_estimado'] = -abs(val_raw)
+
+                            # 3. Normalizar código (pode vir como int do Excel)
                             cod_raw = str(item.get('centro_gasto_codigo', '')).strip()
                             if cod_raw.endswith('.0'): 
                                 cod_raw = cod_raw[:-2]
                             cod_std = cod_raw.zfill(11)
                             
-                            # Buscar na referência
+                            # Atualizar código normalizado no item também, é boa prática
+                            item['centro_gasto_codigo'] = cod_std
+
+                            # 4. Buscar na referência (Regional/Base)
                             match = df_centros[df_centros['codigo'] == cod_std]
                             if not match.empty:
                                 item['regional'] = match.iloc[0]['regional']
                                 item['base'] = match.iloc[0]['base']
                         except Exception:
-                            continue # Se falhar o lookup, segue sem preencher
+                            continue # Se falhar o lookup, segue sem preencher ou com dados parciais
                 
                 # Barra de progresso (fake visual, pois processamento é rápido em lote)
                 progress_text = "Importando registros..."

@@ -165,3 +165,10 @@
 - [x] UI: Tornar campos Regional/Base obrigatórios
 - [x] UI: Implementar seleção por tabela em `Compromissos Ativos`
 - [x] Validar UX e funcionalidade
+
+## 📥 Fase 18: Consistência na Importação em Lote
+
+- [x] UI: Forçar valor negativo no processamento do arquivo
+- [x] UI: Atribuir `usuario` logado (com fallback)
+- [x] UI: Garantir robustez no lookup de Regional/Base
+- [x] Validar fluxo de importação
