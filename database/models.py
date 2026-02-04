@@ -98,10 +98,36 @@ def get_session():
 
 def init_db():
     """
-    Inicializa o banco de dados, criando todas as tabelas.
+    Inicializa o banco de dados.
+    Em produção (Postgres/Neon), roda as migrações do Alembic.
+    Localmente (SQLite), cria as tabelas se não existirem (fallback).
     """
     engine = get_engine()
+    
+    # 1. Cria tabelas básicas (se ainda não existirem)
     Base.metadata.create_all(engine)
+    
+    # 2. Executar migrações (Upsert do Schema)
+    try:
+        from alembic.config import Config
+        from alembic import command
+        
+        # Caminho absoluto para o alembic.ini
+        alembic_ini_path = Path(__file__).parent.parent / "alembic.ini"
+        alembic_cfg = Config(str(alembic_ini_path))
+        
+        # Injetar a URL do banco na configuração do Alembic (runtime)
+        # Isso garante que ele use a mesma conexão que a aplicação
+        db_url = str(engine.url).replace("postgresql+psycopg2://", "postgresql://")
+        alembic_cfg.set_main_option("sqlalchemy.url", db_url)
+        
+        # Executar upgrade head
+        command.upgrade(alembic_cfg, "head")
+        
+    except Exception as e:
+        print(f"⚠️ Aviso: Não foi possível rodar as migrações automáticas: {e}")
+        # Em local dev, pode falhar se não tiver alembic instalado ou configurado, 
+        # mas create_all garante o básico para SQLite novo.
 
 
 # =============================================================================
