@@ -253,6 +253,25 @@ with tab_import:
             if st.button("🚀 Processar Importação", type="primary"):
                 # Converter para lista de dicts
                 lista_dados = df_import.to_dict(orient='records')
+
+                # --- ENRIQUECIMENTO AUTOMÁTICO (Regional e Base) ---
+                # A partir do centro de custo, buscamos a regional e base correspondentes
+                if not df_centros.empty and 'regional' in df_centros.columns:
+                    for item in lista_dados:
+                        try:
+                            # Normalizar código (pode vir como int do Excel)
+                            cod_raw = str(item.get('centro_gasto_codigo', '')).strip()
+                            if cod_raw.endswith('.0'): 
+                                cod_raw = cod_raw[:-2]
+                            cod_std = cod_raw.zfill(11)
+                            
+                            # Buscar na referência
+                            match = df_centros[df_centros['codigo'] == cod_std]
+                            if not match.empty:
+                                item['regional'] = match.iloc[0]['regional']
+                                item['base'] = match.iloc[0]['base']
+                        except Exception:
+                            continue # Se falhar o lookup, segue sem preencher
                 
                 # Barra de progresso (fake visual, pois processamento é rápido em lote)
                 progress_text = "Importando registros..."

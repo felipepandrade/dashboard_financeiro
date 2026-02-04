@@ -1,60 +1,55 @@
-# PLANO DE IMPLEMENTAÇÃO: Atualização de Hierarquia (Regional/Base)
+# Plan for "Lançamentos" Batch Import Improvement
 
-## 🎯 Objetivo
+## Goal
 
-Incorporar os campos **Regional** e **Base** na estrutura de "Centros de Gasto", refletindo essa mudança no banco de dados, na visualização de metadados e facilitando o cadastro de provisões com filtros hierárquicos.
+Automatically fill "Regional" and "Base" fields during the batch import of provisions (importação em lote) in the "Lançamentos" module, ensuring the database is complete for both single and batch entries.
 
-## 📋 Contexto
+## Proposed Changes
 
-- **Solicitante**: Usuário
-- **Fonte de Dados**: `Doc referencia/Centro de Gasto.xlsx` (contém novas colunas).
-- **Impacto**: Banco de Dados (Postgres/SQLite), UI de Lançamentos, UI de Bíblia Financeira.
+### 1. Update `services/provisioning_service.py`
 
-## 🛠️ Alterações Propostas
+The `ProvisioningService` currently ignores `regional` and `base` fields when creating provisions. We need to update it to persist these fields into the `Provisao` table.
 
-### 1. Camada de Dados (Referências)
+#### [MODIFY] `services/provisioning_service.py`
 
-- **Atualizar Arquivo Mestre**: Substituir `data/referencias/centro_gasto.xlsx` pelo novo arquivo em `Doc referencia/Centro de Gasto.xlsx`.
-- **Atualizar `referencias_manager.py`**:
-  - Ajustar `carregar_centros_gasto()` para ler e limpar as colunas `REGIONAL` e `BASE`.
-  - Garantir que `buscar_centros_gasto()` suporte filtros por esses novos campos.
+- In `criar_provisao(self, dados: dict)`:
+  - Extract `regional` and `base` from `dados` (if present).
+  - Pass them to the `Provisao` constructor.
+- In `criar_provisoes_em_lote(self, lista_dados: List[dict])`:
+  - Extract `regional` and `base` from `dados`.
+  - Pass them to the `Provisao` constructor.
 
-### 2. Camada de Banco de Dados (Schema)
+### 2. Update `pages/02_📝_Lancamentos.py`
 
-- **Tabela `lancamentos_realizados`**:
-  - Adicionar coluna `regional` (String)
-  - Adicionar coluna `base` (String)
-  - *Motivo*: Manter consistência histórica desnormalizada (como já é feito com `ativo` e `classe`).
-- **Migração (Alembic)**:
-  - Criar script de migração `add_regional_base_to_lancamentos`.
+The UI module handles the file upload and conversion to dictionary. We will add the logic to look up "Regional" and "Base" from the `df_centros` reference dataframe before calling the service.
 
-### 3. Camada de Interface (UI)
+#### [MODIFY] `pages/02_📝_Lancamentos.py`
 
-#### A. Página `04_📚_Biblia_Financeira.py`
+- In the "Importação em Lote" tab (`with tab_import:`):
+  - Before calling `prov_service.criar_provisoes_em_lote(lista_dados)`:
+  - Iterate over `lista_dados`.
+  - For each record, use `centro_gasto_codigo` to find the corresponding row in `df_centros` (which is already loaded in the page scope).
+  - Retrieve `regional` and `base`.
+  - Populate these keys in the record dictionary.
 
-- Atualizar aba "Metadados" para exibir as novas colunas na tabela de Centros de Custo.
+## Verification Plan
 
-#### B. Página `02_📝_Lancamentos.py` (Aba "Nova Provisão")
+### Automated Verification Script
 
-- **Refatorar Seleção de Centro**:
-  - Adicionar Selectbox: **Regional** (populado dinamicamente).
-  - Adicionar Selectbox: **Base** (filtrado pela Regional selecionada).
-  - Atualizar Selectbox: **Centro de Custo** (filtrado pela Base selecionada).
-  - *Regra*: Se nenhuma Regional for selecionada, comportamento atual (listar tudo) ou forçar filtro? -> *Proposta: Filtros opcionais que "afunilam" a lista.*
+Since manual UI testing is limited in this environment, I will create a python script `scripts/verify_provisao_import.py` to simulate the process.
 
-### 4. Deploy
+**Script Steps:**
 
-- O script de migração será executado automaticamente no deploy (via `alembic upgrade head` ou `init_db` se suportado).
+1. Setup specific database session (using existing `get_session`).
+2. Instantiate `ProvisioningService`.
+3. Create a mock list of import data (dicts) containing `centro_gasto_codigo` but MISSING `regional` / `base`.
+4. Perform the logic that will be in the UI (lookup `regional`/`base` from a mock `df_centros` or the actual one if loadable).
+5. Call `criar_provisoes_em_lote` with the enriched data.
+6. Query the database (`Provisao` table) created by the script (or valid test DB) to verify the new records have `regional` and `base` correctly populated.
+7. Clean up the test data.
 
-## 📅 Etapas de Execução
+### Manual Validation (Post-Implementation)
 
-1. **Backup & Replace**: Atualizar o arquivo Excel de referência.
-2. **Backend Logic**: Atualizar `referencias_manager.py`.
-3. **Database Migration**: Alterar `models.py` e gerar migração Alembic.
-4. **Frontend Update**: Implementar UI em `Lancamentos.py` e `Biblia.py`.
-5. **Verificação**: Testar fluxo de cadastro e visualização.
-
-## ⚠️ Pontos de Atenção
-
-- Verificar se o nome exato das colunas no Excel novo é `REGIONAL` e `BASE` ou variações.
-- Garantir que registros antigos no banco (sem regional) fiquem como `NULL` ou `N/A`.
+- If the user has access to the UI:
+  1. Upload a template Excel with a known Centro de Gasto.
+  2. Verify in the "Compromissos Ativos" list (or via export) that Regional/Base are filled.

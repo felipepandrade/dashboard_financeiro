@@ -26,7 +26,9 @@ class ProvisioningService:
                 # Novos campos
                 numero_contrato=dados.get('numero_contrato'),
                 cadastrado_sistema=dados.get('cadastrado_sistema', False),
-                numero_registro=dados.get('numero_registro')
+                numero_registro=dados.get('numero_registro'),
+                regional=dados.get('regional'),
+                base=dados.get('base')
             )
             session.add(nova)
             session.commit()
@@ -113,7 +115,9 @@ class ProvisioningService:
                         # Novos campos
                         numero_contrato=str(dados.get('numero_contrato', '')) if dados.get('numero_contrato') else None,
                         cadastrado_sistema=bool(cadastrado),
-                        numero_registro=str(dados.get('numero_registro', '')) if dados.get('numero_registro') else None
+                        numero_registro=str(dados.get('numero_registro', '')) if dados.get('numero_registro') else None,
+                        regional=dados.get('regional'),
+                        base=dados.get('base')
                     )
                     session.add(nova)
                     sucesso_count += 1

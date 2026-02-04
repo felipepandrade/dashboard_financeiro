@@ -127,3 +127,9 @@
 - [ ] **Deploy**:
   - [ ] Configurar conexão GitHub
   - [ ] Deploy em Produção
+
+## 🏗️ Fase 12: Melhoria Importação em Lote (Regional/Base Automatico)
+
+- [x] Atualizar `ProvisioningService` para suportar `regional` e `base`
+- [x] Atualizar `02_Lancamentos.py` para realizar lookup de `regional` e `base` no upload
+- [x] Criar script de verificação `scripts/verify_provisao_import.py`
