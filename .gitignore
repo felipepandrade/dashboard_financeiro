@@ -45,8 +45,13 @@ node_modules/
 .next/
 out/
 .nuxt/
-.vuepress/dist
+48: .vuepress/dist
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Database (Adicionado)
+*.db
+*.sqlite3
+data/database/
