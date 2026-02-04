@@ -277,6 +277,24 @@ def setup_page(title: str, icon: str = "📊", layout: str = "wide"):
             st.warning("IA Desabilitada ⚠️")
             
         st.divider()
+        
+        # Monitoramento de Conexão de Banco de Dados (Verificação de Segurança)
+        st.markdown("### 🛢️ Status do Banco de Dados")
+        try:
+            from database.models import get_engine
+            engine = get_engine()
+            url_str = str(engine.url)
+            
+            if "postgresql" in url_str:
+                st.success("🟢 Conectado: Neon (Postgres)")
+                st.caption(f"Host: ...{url_str.split('@')[1].split(':')[0][-15:]}") # Mostra parte do host para confirmar
+            else:
+                st.warning("🟡 Conectado: SQLite (Local)")
+                st.caption("Armazenamento local temporário")
+                
+        except Exception as e:
+            st.error(f"🔴 Erro de Conexão: {str(e)[:20]}...")
+
         st.info("💡 Dica: Use a sidebar para navegar entre os módulos.")
 
 def exibir_kpi_card(label: str, valor: str, delta: str = None, cor_delta: str = "neutral"):
