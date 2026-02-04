@@ -199,3 +199,9 @@
 
 - [x] Backend: Corrigir mapeamento de colunas em `forecast_service.py` ('ds' vs 'data', 'yhat' vs 'previsao')
 - [x] Validar fluxo completo de geração de forecast
+
+## 🔍 Fase 24: Investigação de Discrepância de Dados (Zero Realizado)
+
+- [x] Backend: Analisar `data/comparador.py` e query de realizado
+- [x] Database: Verificar existência de registros na tabela de realizados para 2026
+- [x] Backend: Corrigir filtro de ano/mês se necessário

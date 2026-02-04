@@ -158,7 +158,7 @@ def listar_lancamentos(
         )
         
         if mes:
-            query = query.filter(LancamentoRealizado.mes == mes.upper())
+            query = query.filter(func.upper(LancamentoRealizado.mes) == mes.upper())
         
         if centro_gasto_codigo:
             query = query.filter(LancamentoRealizado.centro_gasto_codigo == centro_gasto_codigo)

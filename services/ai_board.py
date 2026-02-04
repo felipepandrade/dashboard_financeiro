@@ -31,8 +31,17 @@ class AIBoard:
                 # Fallback para string simples se tabulate não estiver instalado
                 resumo = grouped.to_string()
                 
-            total_delta = df['realizado'].sum() - df['orcado'].sum()
-            return f"Resumo YTD:\n{resumo}\n\nDesvio Total Acumulado: R$ {total_delta:,.2f}"
+            total_realizado = df['realizado'].sum()
+            total_orcado = df['orcado'].sum()
+            total_delta = total_realizado - total_orcado
+            
+            resumo_texto = f"Resumo YTD:\n{resumo}\n\nDesvio Total Acumulado: R$ {total_delta:,.2f}"
+            
+            # Smart Diagnostics: Detecta falta de carga de dados
+            if total_realizado == 0 and total_orcado > 0:
+                resumo_texto += "\n\n[SISTEMA NOTICE]: O Total Realizado é exatamente 0.00. Isso indica ALTA PROBABILIDADE de que os dados financeiros deste mês ainda NÃO foram carregados no sistema (Upload Pendente). NÃO assuma que a execução foi zero por incompetência ou falha de gestão. Informe ao usuário que os dados de realizado parecem estar pendentes de carga."
+                
+            return resumo_texto
         except Exception as e:
             return f"Erro ao ler dados: {str(e)}"
 
