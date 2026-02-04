@@ -58,6 +58,7 @@ df_orc_base, df_centros_base, df_contas_base = load_static_data()
 def get_unified_history():
     """Retorna DF unificado do Banco (2024/25) e Session (Upload Atual)."""
     # 1. Carrega do Banco (Via Utils Compartilhado)
+    # Importação movida para dentro (Runtime) para evitar Circular Import durante inicialização
     from utils_financeiro import carregar_historico_realizado_db
     df_db = carregar_historico_realizado_db()
     
