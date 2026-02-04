@@ -146,3 +146,9 @@
 - [x] Investigar falha ao salvar `regional` e `base` (Lancamento Unitário)
 - [x] Corrigir atribuição de `usuario` (está salvando "Sistema")
 - [x] Validar correções
+
+## 🚨 Fase 15: Correção Crítica de Schema (Produção)
+
+- [x] Implementar botão de reparo ("Hotfix") em `07_Gestao_Dados.py`
+- [x] Refatorar lógica de "Salvar Alterações" para evitar `replace`
+- [x] Validar fluxo de correção e salvamento seguro

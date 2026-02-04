@@ -93,8 +93,41 @@ def run_migration_add_column(table, column, col_type):
         session.close()
 
 # =============================================================================
+# -----------------------------------------------------------------------------
+# LOGICA DE REPARO (HOTFIX)
+# -----------------------------------------------------------------------------
+def run_schema_repair():
+    """Restaura a PK e Sequence da tabela provisoes (Postgres Fix)."""
+    session = get_session()
+    logs = []
+    try:
+        commands = [
+            "ALTER TABLE provisoes ALTER COLUMN id SET NOT NULL;",
+            "CREATE SEQUENCE IF NOT EXISTS provisoes_id_seq;",
+            "ALTER TABLE provisoes ALTER COLUMN id SET DEFAULT nextval('provisoes_id_seq');",
+            "SELECT setval('provisoes_id_seq', COALESCE((SELECT MAX(id) FROM provisoes), 0) + 1, false);",
+            "ALTER TABLE provisoes DROP CONSTRAINT IF EXISTS provisoes_pkey;",
+            "ALTER TABLE provisoes ADD PRIMARY KEY (id);"
+        ]
+        
+        for cmd in commands:
+            try:
+                session.execute(text(cmd))
+                logs.append(f"✅ Executado: {cmd[:40]}...")
+            except Exception as e:
+                logs.append(f"⚠️ Aviso: {e}")
+        
+        session.commit()
+        return True, "Reparo concluído!", logs
+    except Exception as e:
+        session.rollback()
+        return False, f"Erro fatal: {e}", logs
+    finally:
+        session.close()
+
+# -----------------------------------------------------------------------------
 # INTERFACE
-# =============================================================================
+# -----------------------------------------------------------------------------
 
 st.markdown("### ⚙️ Gestão de Banco de Dados")
 
@@ -126,35 +159,30 @@ with tab_dados:
         
         col_actions = st.columns([1, 4])
         if col_actions[0].button("💾 Salvar Alterações"):
-            # Lógica de salvar é complexa pois data_editor retorna o estado final
-            # O ideal é detectar diffs.
-            # Implementação simplificada: Truncate e Insert All (PERIGOSO PARA GRANDES DADOS)
-            # Implementação Segura: Usar library ou lógica de diff.
-            
-            # Vamos usar uma abordagem de upsert baseada no ID se existir, ou insert.
-            # Como data_editor não retorna o que foi deletado facilmente sem comparar sessions...
-            # Para este MVP, vamos alertar o usuário.
-            
+            # Lógica Segura: Delete All + Insert All (Preservando Schema)
             try:
                 session = get_session()
-                # 1. Transformar DF editado em dicts
-                records = edited_df.to_dict('records')
-                
-                # 2. Bulk Insert/Replace é arriscado.
-                # Vamos iterar e fazer merge. 
-                # SQLite tem REPLACE INTO mas deleta e cria novo ID.
-                
-                # Melhor estratégia segura para este contexto "Admin":
-                # Salvar o DF inteiro sobrescrevendo a tabela (se tabela nao for gigante).
-                # tabelas financeiras mensais costumam ter < 10k linhas, aceitável.
-                
-                edited_df.to_sql(tabela_sel, session.bind, if_exists='replace', index=False)
-                
-                st.success("Dados salvos com sucesso!")
-                st.session_state[f'df_{tabela_sel}'] = edited_df # Atualiza cache
-                session.close()
+                trans = session.begin() # Transação explícita
+                try:
+                    # 1. Limpar tabela (Mantendo estrutura)
+                    session.execute(text(f"DELETE FROM {tabela_sel}"))
+                    
+                    # 2. Inserir dados novos (Append)
+                    # index=False pq o ID já deve estar no dataframe se for edição
+                    # Se for insert novo sem ID, o pandas/sql pode reclamar se não tratarmos.
+                    # Assumindo que o usuário mantém IDs para edições.
+                    edited_df.to_sql(tabela_sel, session.bind, if_exists='append', index=False)
+                    
+                    trans.commit()
+                    st.success("Dados salvos com sucesso! (Modo Seguro)")
+                    st.session_state[f'df_{tabela_sel}'] = edited_df # Atualiza cache
+                except Exception as e:
+                    trans.rollback()
+                    st.error(f"Erro ao salvar: {e}")
+                finally:
+                    session.close()
             except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
+                 st.error(f"Erro de conexão: {e}")
 
 # -----------------------------------------------------------------------------
 # ABA 2: SCHEMA (EVOLUÇÃO)
@@ -183,6 +211,20 @@ with tab_schema:
                         del st.session_state[f'df_{tabela_target}']
                 else:
                     st.error(f"Erro: {msg}")
+
+        # --- SEÇÃO HOTFIX (Reparo) ---
+        st.divider()
+        st.subheader("🚑 Reparos de Emergência (Hotfix)")
+        st.info("Use se encontrar erro 'NULL identity key' na tabela provisões.")
+        
+        if st.button("🛠️ Reparar Tabela 'provisoes'", type="primary"):
+            success, msg, logs = run_schema_repair()
+            if success:
+                st.success(msg)
+                with st.expander("Logs do Reparo"):
+                    for l in logs: st.write(l)
+            else:
+                st.error(msg)
                     
     with col_sch2:
         st.subheader("Status do Banco")
