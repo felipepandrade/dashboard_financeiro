@@ -32,16 +32,23 @@ if 'admin_mode' not in st.session_state:
 # FUNÇÕES AUXILIARES
 # =============================================================================
 
+from sqlalchemy import inspect
+
 def get_table_names():
-    """Retorna lista de tabelas do banco."""
+    """Retorna lista de tabelas do banco (Compatível Postgres/SQLite)."""
     session = get_session()
     try:
-        # SQLite
-        result = session.execute(text("SELECT name FROM sqlite_master WHERE type='table';"))
-        tables = [row[0] for row in result if row[0] not in ['alembic_version', 'sqlite_sequence']]
-        return tables
+        inspector = inspect(session.bind)
+        return inspector.get_table_names()
+    except Exception as e:
+        st.error(f"Erro ao listar tabelas: {e}")
+        return []
     finally:
         session.close()
+
+# ... (rest of code)
+
+
 
 def load_data(table_name):
     """Carrega dados de uma tabela."""
@@ -179,8 +186,22 @@ with tab_schema:
                     
     with col_sch2:
         st.subheader("Status do Banco")
-        st.text(f"Arquivo: {DATABASE_PATH}")
-        st.metric("Tamanho do Banco", f"{os.path.getsize(DATABASE_PATH) / 1024:.2f} KB")
+        
+        # Detecção de tipo de banco para exibir info adequada
+        session = get_session()
+        is_sqlite = 'sqlite' in str(session.bind.url)
+        session.close()
+        
+        if is_sqlite:
+            st.text(f"Arquivo: {DATABASE_PATH}")
+            try:
+                size_kb = os.path.getsize(DATABASE_PATH) / 1024
+                st.metric("Tamanho do Arquivo", f"{size_kb:.2f} KB")
+            except:
+                st.warning("Arquivo local não encontrado.")
+        else:
+            st.info("☁️ Conectado ao Neon (Postgres)")
+            st.caption("Gerenciado via Cloud")
 
 # =============================================================================
 # RODAPÉ
