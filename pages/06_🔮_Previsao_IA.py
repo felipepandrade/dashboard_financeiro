@@ -197,41 +197,50 @@ with tabs[1]:
             if cenario_sel:
                 df_forecast = forecast_service.get_dados_cenario(cenario_sel['id'])
                 
-                # Gráfico
-                fig = go.Figure()
-                
-                # Realizado
-                df_real = get_comparativo_mensal(2026)
-                fig.add_trace(go.Bar(name='Realizado', x=df_real['mes'], y=df_real['realizado'], marker_color='#059669'))
-                
-                # Provisões (Compromissado - Synergy Feature)
-                saldos_prov = prov_service.get_saldo_provisoes_por_mes()
-                # Mapear para lista ordenada pelos meses
-                # Importar MESES_ORDEM localmente ou definir
-                MESES_ORDEM = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
-                vals_prov = [saldos_prov.get(m, 0.0) for m in MESES_ORDEM]
-                
-                fig.add_trace(go.Bar(
-                    name='Compromissado (Provisões)', 
-                    x=MESES_ORDEM, 
-                    y=vals_prov, 
-                    marker_color='#F59E0B',
-                    opacity=0.6,
-                    hoverinfo='y+name'
-                ))
-                
-                # Previsto
-                # Forecast geralmente cobre meses futuros.
-                fig.add_trace(go.Bar(name='Forecast (Tendência)', x=df_forecast['mes'], y=df_forecast['valor_previsto'], marker_color='#A78BFA'))
-                
-                # Budget (Linha)
-                fig.add_trace(go.Scatter(name='Budget Plan', x=df_real['mes'], y=df_real['orcado'], mode='lines', line=dict(color='#4F8BF9', width=3)))
-                
-                fig.update_layout(barmode='overlay') # Sobrepor barras para melhor comparação
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Tabela de Dados
-                st.dataframe(df_forecast)
+                if df_forecast.empty:
+                    st.warning("⚠️ O cenário selecionado não possui dados gerados (provavelmente por falta de histórico suficiente).")
+                else:
+                    # Gráfico
+                    fig = go.Figure()
+                    
+                    # Realizado
+                    df_real = get_comparativo_mensal(2026)
+                    fig.add_trace(go.Bar(name='Realizado', x=df_real['mes'], y=df_real['realizado'], marker_color='#059669'))
+                    
+                    # Provisões (Compromissado - Synergy Feature)
+                    saldos_prov = prov_service.get_saldo_provisoes_por_mes()
+                    # Mapear para lista ordenada pelos meses
+                    # Importar MESES_ORDEM localmente ou definir
+                    MESES_ORDEM = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
+                    vals_prov = [saldos_prov.get(m, 0.0) for m in MESES_ORDEM]
+                    
+                    fig.add_trace(go.Bar(
+                        name='Compromissado (Provisões)', 
+                        x=MESES_ORDEM, 
+                        y=vals_prov, 
+                        marker_color='#F59E0B',
+                        opacity=0.6,
+                        hoverinfo='y+name'
+                    ))
+                    
+                    # Previsto
+                    # Forecast geralmente cobre meses futuros.
+                    # Garantir que temos 'mes' ou derivar de 'data_ref' se necessário (mas service retorna 'mes')
+                    if 'mes' not in df_forecast.columns and 'data_ref' in df_forecast.columns:
+                         # Fallback de segurança se o service mudar
+                         meses_pt = {1:'JAN', 2:'FEV', 3:'MAR', 4:'ABR', 5:'MAI', 6:'JUN', 7:'JUL', 8:'AGO', 9:'SET', 10:'OUT', 11:'NOV', 12:'DEZ'}
+                         df_forecast['mes'] = pd.to_datetime(df_forecast['data_ref']).dt.month.map(meses_pt)
+
+                    fig.add_trace(go.Bar(name='Forecast (Tendência)', x=df_forecast['mes'], y=df_forecast['valor_previsto'], marker_color='#A78BFA'))
+                    
+                    # Budget (Linha)
+                    fig.add_trace(go.Scatter(name='Budget Plan', x=df_real['mes'], y=df_real['orcado'], mode='lines', line=dict(color='#4F8BF9', width=3)))
+                    
+                    fig.update_layout(barmode='overlay') # Sobrepor barras para melhor comparação
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Tabela de Dados
+                    st.dataframe(df_forecast)
                 
         else:
             st.info("Nenhum cenário de forecast gerado ainda.")

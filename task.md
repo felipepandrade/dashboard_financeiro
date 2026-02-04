@@ -189,3 +189,13 @@
 
 - [x] UI: Corrigir parsing de data "FEV/2026" (Remover dependência de locale)
 - [x] Validar geração de forecast
+
+## 📉 Fase 22: Correção de Erro no Gráfico de Previsão
+
+- [x] UI: Tratar DataFrame vazio em `Previsao_IA.py` (KeyError: 'mes')
+- [x] Validar visualização de cenários
+
+## 🔧 Fase 23: Correção de Lógica de Forecast (Mismatch de Colunas)
+
+- [x] Backend: Corrigir mapeamento de colunas em `forecast_service.py` ('ds' vs 'data', 'yhat' vs 'previsao')
+- [x] Validar fluxo completo de geração de forecast

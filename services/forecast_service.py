@@ -77,7 +77,7 @@ class ForecastService:
                 
                 # Converter para ForecastEntries
                 for _, row in df_pred.iterrows():
-                    mes_idx = row['ds'].month - 1
+                    mes_idx = row['data'].month - 1
                     if 0 <= mes_idx < 12:
                         mes_str = MESES_ORDEM[mes_idx]
                         
@@ -90,7 +90,7 @@ class ForecastService:
                             mes=mes_str,
                             centro_gasto_codigo=centro,
                             conta_contabil_codigo=conta,
-                            valor_previsto=float(row['yhat']),
+                            valor_previsto=float(row['previsao']),
                             metodo_calculo=metodo
                         )
                         entries.append(entry)
