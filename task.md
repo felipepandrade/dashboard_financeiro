@@ -172,3 +172,10 @@
 - [x] UI: Atribuir `usuario` logado (com fallback)
 - [x] UI: Garantir robustez no lookup de Regional/Base
 - [x] Validar fluxo de importação
+
+## 🧠 Fase 19: Atualização de Modelos IA
+
+- [x] UI: Remover OpenAI e atualizar opções para Gemini 3 Pro/Flash
+- [x] Backend: Atualizar mapeamento de modelos (gemini-3-pro/flash-preview)
+- [x] Backend: Remover lógica legado da OpenAI
+- [x] Validar integração com novas APIs

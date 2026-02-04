@@ -271,12 +271,12 @@ def setup_page(title: str, icon: str = "📊", layout: str = "wide"):
         
         # Provedor de IA
         if 'ai_provider' not in st.session_state:
-            st.session_state['ai_provider'] = "Gemini (Google)"
+            st.session_state['ai_provider'] = "Gemini 3 Pro"
             
         provider = st.selectbox(
             "🧠 Provedor de Inteligência",
-            ["Gemini (Google)", "OpenAI (GPT-4)"],
-            index=0 if "Gemini" in st.session_state['ai_provider'] else 1
+            ["Gemini 3 Pro", "Gemini 3 Flash"],
+            index=0 if "Pro" in st.session_state['ai_provider'] else 1
         )
         st.session_state['ai_provider'] = provider
         

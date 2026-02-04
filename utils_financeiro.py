@@ -41,7 +41,7 @@ from plotly.subplots import make_subplots
 
 # --- IA e ML ---
 import google.generativeai as genai
-from openai import OpenAI
+# from openai import OpenAI # Removed
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, mean_absolute_error
 from sklearn.linear_model import LinearRegression
 
@@ -765,36 +765,28 @@ def get_ai_chat_response(messages: List[Dict], api_key: str, provider: str) -> s
         Resposta da IA como string
     """
     try:
-        if "Gemini" in provider:
-            genai.configure(api_key=api_key)
-            
-            # Selecionar modelo (Padrão 3 Pro, fallback para 3 Flash se solicitado)
-            model_name = 'gemini-3-pro-preview'
-            if 'Flash' in provider:
-                model_name = 'gemini-3-flash-preview'
-            
-            # print(f"[DEBUG] Usando Modelo: {model_name}")
-            model = genai.GenerativeModel(model_name)
-            
-            # Concatenar mensagens
-            prompt = "\n".join([msg["content"] for msg in messages if msg["role"] == "user"])
-            response = model.generate_content(prompt)
-            return response.text
+        # Configurar API Key
+        genai.configure(api_key=api_key)
         
-        elif "OpenAI" in provider or "Copilot" in provider:
-            client = OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=messages,
-                temperature=0.7
-            )
-            return response.choices[0].message.content
-        
+        # Mapeamento de Modelos (Gemini 3)
+        # Nomes de API confirmados: gemini-3-pro-preview, gemini-3-flash-preview
+        if 'Flash' in provider:
+            model_name = 'gemini-3-flash-preview'
         else:
-            return "Provedor de IA não reconhecido."
+            model_name = 'gemini-3-pro-preview' # Default para 'Pro'
+            
+        # print(f"[DEBUG] Usando Modelo: {model_name}")
+        model = genai.GenerativeModel(model_name)
+        
+        # Concatenar mensagens
+        prompt = "\n".join([msg["content"] for msg in messages if msg["role"] == "user"])
+        
+        # Gerar resposta
+        response = model.generate_content(prompt)
+        return response.text
     
     except Exception as e:
-        return f"Erro ao consultar IA: {e}"
+        return f"Erro ao consultar Gemini AI ({model_name}): {e}"
 
 
 def gerar_analise_ia(df: pd.DataFrame, api_key: str, provider: str, contexto: str = "") -> str:
