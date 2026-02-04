@@ -40,6 +40,23 @@ def run_historical_import():
     if not os.path.exists(FILE_PATH):
         return False, f"Arquivo não encontrado: {FILE_PATH}", logs
 
+    # 0. Hotfix Schema (Carga Histórica)
+    # Se o banco tiver coluna pequena (VARCHAR 15), o insert falha.
+    # Como é admin task, forçamos o ajuste aqui.
+    try:
+        from sqlalchemy import text
+        session = get_session()
+        log("🔧 Verificando Schema (Hotfix)...")
+        # Tenta alterar tamanho da coluna para 150
+        session.execute(text("ALTER TABLE lancamentos_realizados ALTER COLUMN conta_contabil_codigo TYPE VARCHAR(150);"))
+        session.execute(text("ALTER TABLE razao_realizados ALTER COLUMN conta_contabil_codigo TYPE VARCHAR(150);"))
+        session.commit()
+        log("✅ Schema ajustado (VARCHAR 150).")
+        session.close()
+    except Exception as e:
+        log(f"⚠️ Aviso ao ajustar schema: {e}")
+        # Pode falhar se tabela nao existir (SQLite vazio) ou sem permissão. Segue o jogo.
+
     # 1. Carregar Referências
     log("📚 Carregando referências...")
     df_ref = carregar_centros_gasto()

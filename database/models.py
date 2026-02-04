@@ -175,7 +175,7 @@ class LancamentoRealizado(Base):
     base = Column(String(50), index=True, nullable=True)
     
     # Conta Contábil
-    conta_contabil_codigo = Column(String(15), nullable=False, index=True)
+    conta_contabil_codigo = Column(String(150), nullable=False, index=True)
     conta_contabil_descricao = Column(String(200))
     
     # Detalhes do lançamento
@@ -268,7 +268,7 @@ class RazaoRealizado(Base):
     ano = Column(Integer, nullable=False, index=True)
     mes = Column(String(3), nullable=False, index=True)
     centro_gasto_codigo = Column(String(11), nullable=False, index=True)
-    conta_contabil_codigo = Column(String(15), nullable=False, index=True)
+    conta_contabil_codigo = Column(String(150), nullable=False, index=True)
     fornecedor = Column(String(200))
     descricao = Column(Text)
     valor = Column(Float, nullable=False)
