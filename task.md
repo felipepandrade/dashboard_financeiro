@@ -179,3 +179,8 @@
 - [x] Backend: Atualizar mapeamento de modelos (gemini-3-pro/flash-preview)
 - [x] Backend: Remover lógica legado da OpenAI
 - [x] Validar integração com novas APIs
+
+## 🕵️‍♂️ Fase 20: Debug AI e Integridade de Dados
+
+- [x] Backend: Corrigir dependência `tabulate` em `ai_board.py` (Fallback para `to_string`)
+- [x] Validar resposta do Conselho Consultivo sem erros

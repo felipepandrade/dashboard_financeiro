@@ -23,7 +23,14 @@ class AIBoard:
             if df.empty:
                 return "Dados financeiros não disponíveis."
                 
-            resumo = df.groupby('mes')[['orcado', 'realizado']].sum().to_markdown()
+            # Preparar resumo (com fallback seguro se tabulate falhar)
+            grouped = df.groupby('mes')[['orcado', 'realizado']].sum()
+            try:
+                resumo = grouped.to_markdown()
+            except Exception:
+                # Fallback para string simples se tabulate não estiver instalado
+                resumo = grouped.to_string()
+                
             total_delta = df['realizado'].sum() - df['orcado'].sum()
             return f"Resumo YTD:\n{resumo}\n\nDesvio Total Acumulado: R$ {total_delta:,.2f}"
         except Exception as e:
