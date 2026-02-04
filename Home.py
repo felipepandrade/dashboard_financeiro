@@ -13,7 +13,7 @@ from database.models import init_db
 # CONFIGURAÇÃO INICIAL
 # =============================================================================
 
-setup_page("Home - Baseal Planejamento", "🏠")
+setup_page("Home", "🏠")
 
 # Garantir que o banco de dados (tabelas) exista
 try:
@@ -32,7 +32,7 @@ st.markdown("""
         Sistema de Gestão Financeira
     </h1>
     <p style="color: #94a3b8; font-size: 18px; max_width: 600px; margin: 0 auto;">
-        Central de Inteligência para Tomada de Decisão • Baseal 2026
+        Central de Inteligência para Tomada de Decisão • Baseal
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -128,6 +128,6 @@ with col_info:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #64748b; font-size: 12px;">
-    Dashboard Financeiro v2.0 • Baseal 2026 • Desenvolvido com Streamlit & Python
+    Dashboard Financeiro v2.0 • Baseal 2026
 </div>
 """, unsafe_allow_html=True)
