@@ -55,8 +55,13 @@ def get_engine():
     if not db_url:
         try:
             import streamlit as st
-            if hasattr(st, "secrets") and "DATABASE_URL" in st.secrets:
-                db_url = st.secrets["DATABASE_URL"]
+            if hasattr(st, "secrets"):
+                # 1. Tenta acesso direto (raiz)
+                if "DATABASE_URL" in st.secrets:
+                    db_url = st.secrets["DATABASE_URL"]
+                # 2. Tenta acesso na seção [general] (Comum no Streamlit Cloud)
+                elif "general" in st.secrets and "DATABASE_URL" in st.secrets["general"]:
+                    db_url = st.secrets["general"]["DATABASE_URL"]
         except Exception:
             pass # Ignora erros de importação ou contexto fora do Streamlit
 

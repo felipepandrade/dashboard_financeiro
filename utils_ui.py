@@ -229,6 +229,8 @@ def setup_page(title: str, icon: str = "📊", layout: str = "wide"):
     # Garantir que o banco de dados (tabelas) exista (Executa apenas 1x devido ao cache)
     try:
         init_db()
+        from services.auth_service import AuthService
+        AuthService.create_initial_admin()
     except Exception as e:
         st.error(f"Erro Crítico ao conectar no Banco de Dados: {e}")
         
