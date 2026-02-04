@@ -1337,3 +1337,87 @@ def get_resumo_importacao():
     """Retorna resumo da última importação."""
     return st.session_state.get('pl_resumo_importacao', {})
 
+
+# =============================================================================
+# 11. PERSISTÊNCIA E INTEGRAÇÃO DB (Fase 5 - 2026)
+# =============================================================================
+
+def carregar_historico_realizado_db() -> pd.DataFrame:
+    """
+    Carrega histórico Realizado (2024/2025) do banco de dados e formata
+    como DataFrame compatível com a estrutura de P&L da aplicação (session_state['pl_df']).
+    """
+    from database.models import get_session, LancamentoRealizado
+    session = get_session()
+    try:
+        # Traz apenas Realizado (ignora orçamentos DB se existirem)
+        # Otimização: Trazer apenas campos necessários se ficar lento
+        dados = session.query(LancamentoRealizado).all()
+        
+        if not dados:
+            return pd.DataFrame()
+            
+        records = [d.to_dict() for d in dados]
+        df = pd.DataFrame(records)
+        
+        if df.empty: return df
+        
+        # Mapeamento de Colunas DB -> App P&L
+        # DB: id, ano, mes, centro_gasto_codigo, centro_gasto_descricao, conta_contabil_codigo, valor...
+        # App: codigo_centro_gasto, centro_gasto_nome, conta_contabil, mes, tipo_valor, valor, ano, data...
+        
+        df['tipo_valor'] = 'Realizado'
+        
+        # Normalização de Nomes
+        rename_map = {
+            'centro_gasto_descricao': 'centro_gasto_nome',
+            'conta_contabil_codigo': 'conta_contabil', # No DB salvamos o código/nome da conta aqui
+            'centro_gasto_codigo': 'codigo_centro_gasto'
+        }
+        df.rename(columns=rename_map, inplace=True)
+        
+        # Garantir colunas essenciais
+        if 'centro_gasto_nome' not in df.columns:
+            if 'ativo' in df.columns:
+                df['centro_gasto_nome'] = df['ativo'] # Fallback
+            else:
+                df['centro_gasto_nome'] = 'Desconhecido'
+            
+        # Criar coluna DATA
+        MESES_NUM = {'JAN':1, 'FEV':2, 'MAR':3, 'ABR':4, 'MAI':5, 'JUN':6, 
+                     'JUL':7, 'AGO':8, 'SET':9, 'OUT':10, 'NOV':11, 'DEZ':12}
+        
+        if 'mes' in df.columns:
+            df['mes_num'] = df['mes'].map(MESES_NUM)
+            
+            def make_date(row):
+                try:
+                    return datetime(row['ano'], int(row['mes_num']), 1)
+                except:
+                    return None
+            
+            df['data'] = df.apply(make_date, axis=1)
+        
+        return df
+        
+    except Exception as e:
+        print(f"Erro ao carregar DB Histórico: {e}")
+        return pd.DataFrame()
+    finally:
+        session.close()
+
+def garantir_dados_sessao():
+    """
+    Assegura que st.session_state['pl_df'] tenha dados.
+    Se estiver vazio, carrega do Banco (Histórico Persistido).
+    Chamado no início de páginas críticas (Home, Análise, Forecast).
+    """
+    if 'pl_df' not in st.session_state or st.session_state['pl_df'] is None or st.session_state['pl_df'].empty:
+        df_db = carregar_historico_realizado_db()
+        if not df_db.empty:
+            df_db['origem_dado'] = 'Banco de Dados (Automático)'
+            st.session_state['pl_df'] = df_db
+            return True
+            
+    return False
+

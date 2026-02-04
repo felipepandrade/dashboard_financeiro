@@ -41,6 +41,13 @@ razao_df = st.session_state.get('razao_df')
 api_key = st.session_state.get('api_key', '')
 ai_provider = st.session_state.get('ai_provider', 'Gemini (Google)')
 
+# Tentar hidratação automática do Banco se vazio
+if pl_df is None:
+    from utils_financeiro import garantir_dados_sessao
+    if garantir_dados_sessao():
+        pl_df = st.session_state['pl_df']
+        st.toast("Dados históricos carregados do banco.", icon="💾")
+
 if pl_df is None:
     st.warning("⚠️ **Nenhum dado de P&L carregado.**")
     st.info("👈 Retorne à página inicial (Home) para fazer o upload dos arquivos.")

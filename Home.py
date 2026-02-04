@@ -4,7 +4,8 @@ from pathlib import Path
 from utils_financeiro import (
     verificar_status_dados,
     processar_upload_pl,
-    get_resumo_importacao
+    get_resumo_importacao,
+    garantir_dados_sessao
 )
 from utils_ui import setup_page, exibir_kpi_card, formatar_valor_brl, require_auth
 from database.models import init_db
@@ -18,6 +19,9 @@ setup_page("Home", "🏠")
 # Garantir que o banco de dados (tabelas) exista
 try:
     init_db()
+    # Tenta carregar histórico (2024/2025) automaticamente se sessão vazia
+    if garantir_dados_sessao():
+        st.toast("Dados históricos restaurados do banco de dados.", icon="🔄")
 except Exception as e:
     st.error(f"Erro ao inicializar banco de dados: {e}")
 require_auth()
