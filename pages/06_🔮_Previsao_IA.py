@@ -159,7 +159,9 @@ with tabs[1]:
                         # Mock temporário: Usar os dados realizados existentes
                         # Vou criar um adapter rápido
                         data_adapter = df_realizado.copy()
-                        data_adapter['data_ref'] = pd.to_datetime(data_adapter['mes'] + '/2026', format='%b/%Y')  # Ajustar locale se preciso
+                        MESES_MAP_FIX = {m: i+1 for i, m in enumerate(['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'])}
+                        data_adapter['month_num_temp'] = data_adapter['mes'].map(MESES_MAP_FIX)
+                        data_adapter['data_ref'] = data_adapter.apply(lambda x: pd.Timestamp(year=2026, month=x['month_num_temp'], day=1), axis=1)
                         data_adapter['valor'] = data_adapter['realizado']
                         # Falta conta contabil... O forecast service precisa de conta.
                         # Vou pedir para o usuário: "Forecast Global" por enquanto (Soma tudo)

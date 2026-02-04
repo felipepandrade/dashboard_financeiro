@@ -184,3 +184,8 @@
 
 - [x] Backend: Corrigir dependência `tabulate` em `ai_board.py` (Fallback para `to_string`)
 - [x] Validar resposta do Conselho Consultivo sem erros
+
+## 📅 Fase 21: Debug Forecast Date Error
+
+- [x] UI: Corrigir parsing de data "FEV/2026" (Remover dependência de locale)
+- [x] Validar geração de forecast
