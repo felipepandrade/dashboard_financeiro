@@ -229,6 +229,14 @@ with tab_import:
                     status.update(label="✅ Importação Concluída!", state="complete", expanded=False)
                     st.success(msg)
                     st.balloons()
+                    
+                    # --- INVALIDAÇÃO DE CACHE (Visualização) ---
+                    # Força a aba "Editar Dados" a recarregar o banco
+                    keys_to_clear = ['df_lancamentos_realizados', 'df_razao_realizados']
+                    for key in keys_to_clear:
+                        if key in st.session_state:
+                            del st.session_state[key]
+                    st.toast("Cache de visualização atualizado!", icon="🔄")
                 else:
                     status.update(label="❌ Falha na Importação", state="error", expanded=True)
                     st.error(msg)

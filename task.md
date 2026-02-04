@@ -133,3 +133,10 @@
 - [x] Atualizar `ProvisioningService` para suportar `regional` e `base`
 - [x] Atualizar `02_Lancamentos.py` para realizar lookup de `regional` e `base` no upload
 - [x] Criar script de verificação `scripts/verify_provisao_import.py`
+
+## 🐛 Fase 13: Investigação Discrepância de Dados (Histórico)
+
+- [x] Analisar origem de dados da `04_Biblia_Financeira.py`
+- [x] Verificar persistência real em `services/historical_import.py`
+- [x] Verificar conexão de banco em `07_Gestao_Dados.py`
+- [x] Corrigir divergência de leitura/escrita
