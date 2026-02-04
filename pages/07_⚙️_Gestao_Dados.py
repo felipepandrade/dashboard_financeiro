@@ -139,8 +139,18 @@ tab_dados, tab_schema, tab_import = st.tabs(["📝 Editar Dados", "🔧 Estrutur
 with tab_dados:
     st.info("💡 Edite dados diretamente na tabela. Pressione 'Enter' para confirmar a célula e depois 'Salvar Alterações'.")
     
-    tabelas = get_table_names()
-    tabela_sel = st.selectbox("Selecione a Tabela:", tabelas)
+    col_sel, col_btn = st.columns([3, 1])
+    with col_sel:
+        tabelas = get_table_names()
+        tabela_sel = st.selectbox("Selecione a Tabela:", tabelas)
+    
+    with col_btn:
+        st.write("") # Spacer align
+        st.write("")
+        if st.button("🔄 Recarregar", help="Atualizar dados do banco"):
+            if tabela_sel and f'df_{tabela_sel}' in st.session_state:
+                del st.session_state[f'df_{tabela_sel}']
+            st.rerun()
     
     if tabela_sel:
         # Carregar dados

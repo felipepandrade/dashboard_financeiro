@@ -152,3 +152,8 @@
 - [x] Implementar botão de reparo ("Hotfix") em `07_Gestao_Dados.py`
 - [x] Refatorar lógica de "Salvar Alterações" para evitar `replace`
 - [x] Validar fluxo de correção e salvamento seguro
+
+## 🔄 Fase 16: Correção de Cache (Gestão de Dados)
+
+- [x] Adicionar botão "Recarregar Dados" em `07_Gestao_Dados.py`
+- [x] Validar atualização da tabela `provisoes`
