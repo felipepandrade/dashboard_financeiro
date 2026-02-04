@@ -39,7 +39,7 @@ class ProvisioningService:
         finally:
             session.close()
 
-    def listar_provisoes(self, status: str = None, mes: str = None) -> List[dict]:
+    def listar_provisoes(self, status: str = None, mes: str = None, base: str = None) -> List[dict]:
         """Lista provisões com filtros."""
         session = get_session()
         try:
@@ -48,6 +48,8 @@ class ProvisioningService:
                 query = query.filter(Provisao.status == status)
             if mes:
                 query = query.filter(Provisao.mes_competencia == mes)
+            if base:
+                query = query.filter(Provisao.base == base)
                 
             return [p.to_dict() for p in query.all()]
         finally:

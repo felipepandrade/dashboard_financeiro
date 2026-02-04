@@ -157,3 +157,11 @@
 
 - [x] Adicionar botão "Recarregar Dados" em `07_Gestao_Dados.py`
 - [x] Validar atualização da tabela `provisoes`
+
+## 🚀 Fase 17: Melhorias em Lançamentos
+
+- [x] Backend: Adicionar filtro por Base em `listar_provisoes`
+- [x] UI: Forçar valor negativo em `Nova Provisão`
+- [x] UI: Tornar campos Regional/Base obrigatórios
+- [x] UI: Implementar seleção por tabela em `Compromissos Ativos`
+- [x] Validar UX e funcionalidade

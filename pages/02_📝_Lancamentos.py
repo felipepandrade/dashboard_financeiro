@@ -166,30 +166,37 @@ with tab_novo:
             # Validação
             erros = []
             if not descricao: erros.append("Descrição obrigatória")
-            if valor <= 0: erros.append("Valor deve ser maior que zero")
+            if valor <= 0: erros.append("Informe o valor do compromisso (maior que zero)")
             if not centro_sel: erros.append("Centro de Custo obrigatório")
             if not conta_sel: erros.append("Conta Contábil obrigatória")
             if cadastrado_sis == "Sim" and not num_registro: erros.append("Número do Registro é obrigatório para item cadastrado")
+
+            # Preparar dados de Regional/Base
+            cod_centro_clean = centro_sel.split(' - ')[0] if centro_sel else ""
+            reg_val = sel_regional if sel_regional != "Todas" else None
+            base_val = sel_base if sel_base != "Todas" else None
+            
+            # Fallback: Se não selecionou (foi via Todas ou direto), tenta buscar na base
+            if (not reg_val or not base_val) and not df_centros.empty and cod_centro_clean:
+                match = df_centros[df_centros['codigo'] == cod_centro_clean]
+                if not match.empty:
+                    if not reg_val: reg_val = match.iloc[0].get('regional')
+                    if not base_val: base_val = match.iloc[0].get('base')
+
+            # Validação de Regional e Base (Obrigatórios)
+            if not reg_val: erros.append("Regional é obrigatória (Selecione ou verifique o cadastro do Centro)")
+            if not base_val: erros.append("Base é obrigatória (Selecione ou verifique o cadastro do Centro)")
 
             if erros:
                 for e in erros: st.error(f"❌ {e}")
             else:
                 try:
-                    # Preparar dados de Regional/Base
-                    cod_centro_clean = centro_sel.split(' - ')[0]
-                    reg_val = sel_regional if sel_regional != "Todas" else None
-                    base_val = sel_base if sel_base != "Todas" else None
-                    
-                    # Fallback: Se não selecionou (foi via Todas ou direto), tenta buscar na base
-                    if (not reg_val or not base_val) and not df_centros.empty:
-                        match = df_centros[df_centros['codigo'] == cod_centro_clean]
-                        if not match.empty:
-                            if not reg_val: reg_val = match.iloc[0].get('regional')
-                            if not base_val: base_val = match.iloc[0].get('base')
+                    # FORÇA VALOR NEGATIVO (GASTO)
+                    valor_final = -abs(valor)
 
                     dados = {
                         "descricao": f"{descricao} ({fornecedor})" if fornecedor else descricao,
-                        "valor_estimado": valor,
+                        "valor_estimado": valor_final,
                         "centro_gasto_codigo": cod_centro_clean,
                         "conta_contabil_codigo": conta_sel.split(' - ')[0],
                         "mes_competencia": mes,
@@ -315,15 +322,21 @@ with tab_import:
 with tab_lista:
     st.markdown('<div class="section-header"><span class="section-title">Compromissos em Aberto</span></div>', unsafe_allow_html=True)
     
-    col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
+    # Prepara opções de Base
+    bases_options = sorted(df_centros['base'].dropna().unique().tolist()) if 'base' in df_centros.columns else []
+
+    col_f1, col_f2, col_f3, col_f4 = st.columns([1.5, 1.5, 1.5, 1])
     with col_f1:
         filtro_mes = st.selectbox("Filtrar Mês", ["Todos"] + MESES_ORDEM)
     with col_f2:
+        filtro_base = st.selectbox("Filtrar Base", ["Todas"] + bases_options)
+    with col_f3:
         filtro_status = st.selectbox("Status", ["TODOS", "PENDENTE", "REALIZADA", "CANCELADA"], index=1)
     
     lista = prov_service.listar_provisoes(
         status=None if filtro_status == "TODOS" else filtro_status,
-        mes=None if filtro_mes == "Todos" else filtro_mes
+        mes=None if filtro_mes == "Todos" else filtro_mes,
+        base=None if filtro_base == "Todas" else filtro_base
     )
 
     if lista:
@@ -331,7 +344,7 @@ with tab_lista:
         df['Valor'] = df['valor_estimado'].apply(formatar_valor_brl)
         
         # --- EXPORTAR ---
-        with col_f3:
+        with col_f4:
             st.write("") # Spacer
             st.write("") 
             output = BytesIO()
@@ -339,21 +352,26 @@ with tab_lista:
                 df.to_excel(writer, index=False, sheet_name='Provisões')
             
             st.download_button(
-                label="📥 Exportar Excel",
+                label="📥 Exportar",
                 data=output.getvalue(),
                 file_name=f"provisoes_{filtro_mes}_{datetime.now().strftime('%d%m')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True
             )
 
-        # GRID
-        st.dataframe(
-            df[['id', 'mes_competencia', 'descricao', 'centro_gasto_codigo', 'status', 'numero_registro', 'Valor']],
+        # GRID COM SELEÇÃO
+        st.info("👆 Selecione uma linha na tabela para editar ou cancelar.")
+        
+        event = st.dataframe(
+            df[['mes_competencia', 'base', 'regional', 'descricao', 'centro_gasto_codigo', 'status', 'numero_registro', 'Valor']],
             use_container_width=True,
             hide_index=True,
+            on_select="rerun",
+            selection_mode="single-row",
             column_config={
-                "id": st.column_config.NumberColumn("#", width="small"),
                 "mes_competencia": st.column_config.TextColumn("Mês", width="small"),
+                "base": st.column_config.TextColumn("Base", width="small"),
+                "regional": st.column_config.TextColumn("Regional", width="small"),
                 "descricao": "Descrição",
                 "centro_gasto_codigo": "Centro",
                 "status": st.column_config.TextColumn("Status", width="small"),
@@ -362,55 +380,61 @@ with tab_lista:
             }
         )
         
-        # --- ÁREA DE EDIÇÃO / AÇÃO ---
-        st.markdown("---")
-        st.markdown("#### ✏️ Gerenciar Item")
-        
-        opcoes_item = [f"{p['id']} - {p['descricao']} ({p['status']})" for p in lista]
-        item_selecionado = st.selectbox("Selecione um item para Editar ou Cancelar:", options=["Selecione..."] + opcoes_item)
-        
-        if item_selecionado and item_selecionado != "Selecione...":
-            _id = int(item_selecionado.split(' - ')[0])
-            # Buscar dados atuais
-            item_atual = next((p for p in lista if p['id'] == _id), None)
+        # Lógica de Seleção
+        if event.selection.rows:
+            idx = event.selection.rows[0]
+            # O índice retornado corresponde ao DataFrame passado para st.dataframe
+            # Como dataframes filtrados/ordenados no backend retornam nova lista, o índice é consistente com 'lista'/'df'
+            item_atual = lista[idx]
+            _id = item_atual['id']
             
-            if item_atual:
-                with st.expander("🛠️ Editar Dados do Lançamento", expanded=True):
-                    with st.form(key=f"edit_form_{_id}"):
-                        col_e1, col_e2, col_e3 = st.columns(3)
-                        
-                        novo_valor = col_e1.number_input("Valor (R$)", value=float(item_atual['valor_estimado']), step=100.0)
-                        novo_status = col_e2.selectbox("Status", ["PENDENTE", "REALIZADA", "CANCELADA"], index=["PENDENTE", "REALIZADA", "CANCELADA"].index(item_atual['status']))
-                        novo_reg = col_e3.text_input("Nº Registro / RC", value=item_atual.get('numero_registro') or "")
-                        
-                        nova_desc = st.text_input("Descrição", value=item_atual['descricao'])
-                        
-                        chk_cadastrado = st.checkbox("Cadastrado no Sistema?", value=item_atual.get('cadastrado_sistema', False))
+            # --- ÁREA DE EDIÇÃO / AÇÃO ---
+            st.markdown("---")
+            # Ajuste visual para destacar a seleção
+            st.markdown(f"#### ✏️ Gerenciar Item: {_id} - {item_atual['descricao']}")
+            
+            with st.expander("🛠️ Formulário de Edição", expanded=True):
+                with st.form(key=f"edit_form_{_id}"):
+                    col_e1, col_e2, col_e3 = st.columns(3)
+                    
+                    # Valor
+                    val_atual = float(item_atual['valor_estimado'])
+                    # Se for negativo (gasto), mostra absoluto para edição ou mantém negativo?
+                    # Geralmente melhor manter a sinalética ou pedir positivo e inverter.
+                    # Vamos mostrar como está no banco.
+                    
+                    novo_valor = col_e1.number_input("Valor (R$ - Negativo para Gasto)", value=val_atual, step=100.0)
+                    novo_status = col_e2.selectbox("Status", ["PENDENTE", "REALIZADA", "CANCELADA"], index=["PENDENTE", "REALIZADA", "CANCELADA"].index(item_atual['status']))
+                    novo_reg = col_e3.text_input("Nº Registro / RC", value=item_atual.get('numero_registro') or "")
+                    
+                    nova_desc = st.text_input("Descrição", value=item_atual['descricao'])
+                    
+                    chk_cadastrado = st.checkbox("Cadastrado no Sistema?", value=item_atual.get('cadastrado_sistema', False))
 
-                        col_btn1, col_btn2 = st.columns([1, 4])
-                        submit = col_btn1.form_submit_button("💾 Salvar Alterações", type="primary")
-                        
-                        if submit:
-                            dados_upd = {
-                                "valor_estimado": novo_valor,
-                                "status": novo_status,
-                                "numero_registro": novo_reg,
-                                "descricao": nova_desc,
-                                "cadastrado_sistema": chk_cadastrado
-                            }
-                            # Validação simples
-                            if novo_status == "REALIZADA" and not novo_reg:
-                                st.error("Para status REALIZADA, informe o Número de Registro.")
-                            else:
-                                prov_service.atualizar_provisao(_id, dados_upd)
-                                st.success("Atualizado com sucesso!")
-                                st.rerun()
+                    col_btn1, col_btn2 = st.columns([1, 4])
+                    submit = col_btn1.form_submit_button("💾 Salvar Alterações", type="primary")
+                    
+                    if submit:
+                        dados_upd = {
+                            "valor_estimado": novo_valor,
+                            "status": novo_status,
+                            "numero_registro": novo_reg,
+                            "descricao": nova_desc,
+                            "cadastrado_sistema": chk_cadastrado
+                        }
+                        # Validação simples
+                        if novo_status == "REALIZADA" and not novo_reg:
+                            st.error("Para status REALIZADA, informe o Número de Registro.")
+                        else:
+                            prov_service.atualizar_provisao(_id, dados_upd)
+                            st.success("Atualizado com sucesso!")
+                            st.rerun()
 
-                # Botão Cancelar separado do form
-                if st.button("🗑️ Cancelar este Item (Definitivo)", key="bt_canc_sep"):
-                     prov_service.cancelar_provisao(_id, "Cancelado via Interface")
-                     st.success("Item cancelado.")
-                     st.rerun()
+            # Botão Cancelar separado do form
+            if st.button("🗑️ Cancelar este Item (Definitivo)", key="bt_canc_sep"):
+                    prov_service.cancelar_provisao(_id, "Cancelado via Interface")
+                    st.success("Item cancelado.")
+                    st.rerun()
 
     else:
-        st.info("📭 Nenhum registro encontrado.")
+        st.info("📭 Nenhum registro encontrado para os filtros selecionados.")
