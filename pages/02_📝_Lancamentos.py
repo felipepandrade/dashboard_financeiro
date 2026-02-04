@@ -175,22 +175,34 @@ with tab_novo:
                 for e in erros: st.error(f"❌ {e}")
             else:
                 try:
+                    # Preparar dados de Regional/Base
+                    cod_centro_clean = centro_sel.split(' - ')[0]
+                    reg_val = sel_regional if sel_regional != "Todas" else None
+                    base_val = sel_base if sel_base != "Todas" else None
+                    
+                    # Fallback: Se não selecionou (foi via Todas ou direto), tenta buscar na base
+                    if (not reg_val or not base_val) and not df_centros.empty:
+                        match = df_centros[df_centros['codigo'] == cod_centro_clean]
+                        if not match.empty:
+                            if not reg_val: reg_val = match.iloc[0].get('regional')
+                            if not base_val: base_val = match.iloc[0].get('base')
+
                     dados = {
                         "descricao": f"{descricao} ({fornecedor})" if fornecedor else descricao,
                         "valor_estimado": valor,
-                        "centro_gasto_codigo": centro_sel.split(' - ')[0],
+                        "centro_gasto_codigo": cod_centro_clean,
                         "conta_contabil_codigo": conta_sel.split(' - ')[0],
                         "mes_competencia": mes,
                         "tipo_despesa": tipo_despesa,
                         "justificativa_obz": justificativa,
-                        "usuario": "Sistema",
+                        "usuario": st.session_state.get('username', 'Sistema'),
                         # Novos Campos
                         "numero_contrato": num_contrato,
                         "cadastrado_sistema": True if cadastrado_sis == "Sim" else False,
                         "numero_registro": num_registro,
                         # Novos campos de hierarquia
-                        "regional": df_centros.loc[df_centros['codigo'] == centro_sel.split(' - ')[0], 'regional'].values[0] if 'regional' in df_centros.columns else None,
-                        "base": df_centros.loc[df_centros['codigo'] == centro_sel.split(' - ')[0], 'base'].values[0] if 'base' in df_centros.columns else None
+                        "regional": reg_val,
+                        "base": base_val
                     }
                     prov_service.criar_provisao(dados)
                     st.session_state.sucesso_prov = "✅ Provisão registrada com sucesso!"

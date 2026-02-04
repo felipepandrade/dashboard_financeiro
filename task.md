@@ -140,3 +140,9 @@
 - [x] Verificar persistência real em `services/historical_import.py`
 - [x] Verificar conexão de banco em `07_Gestao_Dados.py`
 - [x] Corrigir divergência de leitura/escrita
+
+## 🐛 Fase 14: Correção de Bugs (Criação de Provisão)
+
+- [x] Investigar falha ao salvar `regional` e `base` (Lancamento Unitário)
+- [x] Corrigir atribuição de `usuario` (está salvando "Sistema")
+- [x] Validar correções
