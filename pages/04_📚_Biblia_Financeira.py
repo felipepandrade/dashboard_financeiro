@@ -225,7 +225,6 @@ with tab_orc:
 with tab_hist:
     st.markdown("### 🕰️ Histórico Realizado (P&L)")
     
-    st.markdown("### 🕰️ Histórico Realizado (P&L)")
     
     if df_hist_view is not None and not df_hist_view.empty:
         # Filtro de Ano
@@ -238,7 +237,8 @@ with tab_hist:
             df_table = df_hist_view
             
         # Resumo KPI
-        meses_hist = df_table['mes'].nunique() if 'mes' in df_table.columns else 0
+        # Conta combinações únicas de Ano+Mes para refletir total de meses carregados (ex: 12 de 2024 + 12 de 2025 = 24)
+        meses_hist = df_table[['ano', 'mes']].drop_duplicates().shape[0] if {'ano', 'mes'}.issubset(df_table.columns) else 0
         total_hist = df_table.query("tipo_valor == 'Realizado'")['valor'].sum()
         
         c1, c2, c3 = st.columns(3)
