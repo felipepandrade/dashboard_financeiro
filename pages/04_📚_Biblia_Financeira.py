@@ -43,10 +43,74 @@ def load_static_data():
     df_contas = carregar_contas_contabeis()
     return df_orc, df_centros, df_contas
 
+def load_pl_from_db():
+    """Carrega dados históricos (Realizado) do banco de dados Neon."""
+    from database.models import get_session, LancamentoRealizado
+    from datetime import datetime
+    
+    session = get_session()
+    try:
+        # Buscar apenas Realizado (ignora Budgets que são estáticos)
+        query = session.query(LancamentoRealizado)
+        # Opcional: Filtrar apenas anos fechados ou tudo
+        dados = query.all()
+        
+        if not dados:
+            return pd.DataFrame()
+            
+        # Converter para lista de dicts
+        records = [d.to_dict() for d in dados]
+        df = pd.DataFrame(records)
+        
+        if df.empty: return df
+        
+        # Adaptação para esquema do P&L (utils_financeiro)
+        # Colunas esperadas: codigo_centro_gasto, centro_gasto_nome, conta_contabil, mes, tipo_valor, valor, ano, data
+        
+        # Mapeamento
+        df['tipo_valor'] = 'Realizado' # Banco só guarda realizado
+        # centro_gasto_nome vem de 'centro_gasto_descricao' ou 'regional/base'? 
+        # No upload, vem do map. Aqui, temos descricao.
+        # Vamos usar a descrição salva.
+        if 'centro_gasto_descricao' in df.columns:
+            df.rename(columns={'centro_gasto_descricao': 'centro_gasto_nome'}, inplace=True)
+            
+        # map meses number
+        MESES_NUM = {'JAN':1, 'FEV':2, 'MAR':3, 'ABR':4, 'MAI':5, 'JUN':6, 
+                     'JUL':7, 'AGO':8, 'SET':9, 'OUT':10, 'NOV':11, 'DEZ':12}
+        
+        df['mes_num'] = df['mes'].map(MESES_NUM)
+        
+        # Criar data
+        def make_date(row):
+            try:
+                return datetime(row['ano'], row['mes_num'], 1)
+            except:
+                return None
+        
+        df['data'] = df.apply(make_date, axis=1)
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"Erro ao carregar histórico do banco: {e}")
+        return pd.DataFrame()
+    finally:
+        session.close()
+
 df_orc_base, df_centros_base, df_contas_base = load_static_data()
 
 # Dados de Sessão (Realizado/Histórico)
 pl_df_session = st.session_state.get('pl_df')
+
+# Fallback: Se não tem na sessão, tenta carregar do banco (Histórico Persistido)
+if pl_df_session is None or pl_df_session.empty:
+    with st.spinner("Carregando histórico financeiro do banco de dados..."):
+        pl_df_db = load_pl_from_db()
+        if not pl_df_db.empty:
+            st.session_state['pl_df'] = pl_df_db
+            pl_df_session = pl_df_db
+            # st.toast("Histórico carregado do banco de dados!", icon="💾")
 
 # =============================================================================
 # TABS PRINCIPAIS

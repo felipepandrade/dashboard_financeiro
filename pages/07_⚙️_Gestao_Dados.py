@@ -98,7 +98,7 @@ def run_migration_add_column(table, column, col_type):
 
 st.markdown("### ⚙️ Gestão de Banco de Dados")
 
-tab_dados, tab_schema = st.tabs(["📝 Editar Dados", "🔧 Estrutura (Schema)"])
+tab_dados, tab_schema, tab_import = st.tabs(["📝 Editar Dados", "🔧 Estrutura (Schema)", "📥 Importação Histórica"])
 
 # -----------------------------------------------------------------------------
 # ABA 1: DADOS (CRUD)
@@ -202,6 +202,46 @@ with tab_schema:
         else:
             st.info("☁️ Conectado ao Neon (Postgres)")
             st.caption("Gerenciado via Cloud")
+
+# -----------------------------------------------------------------------------
+# ABA 3: IMPORTAÇÃO HISTÓRICA (Nova)
+# -----------------------------------------------------------------------------
+with tab_import:
+    st.markdown("### 📥 Importação de Histórico (Legado)")
+    st.info("Ferramenta para carga inicial ou correção de dados históricos (2024/2025) a partir do arquivo padrão.")
+    
+    st.markdown("**Arquivo Fonte:** `Doc referencia/P&L - Dezembro_2025.xlsx`")
+    
+    col_imp, col_help = st.columns([1, 2])
+    with col_imp:
+        if st.button("🚀 Iniciar Importação (2024-2025)", type="primary"):
+            # Importação Lazy para evitar erro circular ou carga desnecessária
+            from services.historical_import import run_historical_import
+            
+            with st.status("Processando importação...", expanded=True) as status:
+                st.write("Iniciando serviço...")
+                success, msg, logs = run_historical_import()
+                
+                for log in logs:
+                    st.text(f"> {log}")
+                
+                if success:
+                    status.update(label="✅ Importação Concluída!", state="complete", expanded=False)
+                    st.success(msg)
+                    st.balloons()
+                else:
+                    status.update(label="❌ Falha na Importação", state="error", expanded=True)
+                    st.error(msg)
+    
+    with col_help:
+        st.markdown("""
+        **O que isso faz:**
+        1. Lê o P&L de Dezembro/2025.
+        2. Extrai dados **Realizados** de 2025.
+        3. Extrai dados **LY - Actual** de 2024.
+        4. Enriquece com Regional/Base.
+        5. **Substitui** registros existentes desses anos no banco.
+        """)
 
 # =============================================================================
 # RODAPÉ
