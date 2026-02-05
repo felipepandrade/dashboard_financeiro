@@ -370,6 +370,123 @@ with tab_lista:
                 use_container_width=True
             )
 
+        # =====================================================================
+        # SEÇÃO: ATUALIZAÇÃO EM LOTE (BULK UPDATE)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("#### 📦 Atualização em Lote")
+        
+        col_bulk1, col_bulk2 = st.columns(2)
+        
+        with col_bulk1:
+            # --- DOWNLOAD PENDENTES ---
+            lista_pendentes = prov_service.listar_provisoes(status='PENDENTE')
+            
+            if lista_pendentes:
+                st.info(f"📋 **{len(lista_pendentes)}** provisões PENDENTES disponíveis para edição em lote.")
+                
+                # Gerar Excel com colunas específicas para edição
+                df_export = pd.DataFrame(lista_pendentes)
+                
+                # Selecionar e ordenar colunas para export
+                cols_export = ['id', 'descricao', 'centro_gasto_codigo', 'mes_competencia', 
+                               'valor_estimado', 'status', 'numero_registro', 'cadastrado_sistema']
+                
+                # Adicionar data_atualizacao para controle de conflito (hidden conceptually)
+                if 'data_atualizacao' not in df_export.columns:
+                    df_export['data_atualizacao'] = None
+                cols_export.append('data_atualizacao')
+                
+                df_export = df_export[[c for c in cols_export if c in df_export.columns]]
+                
+                # Gerar Excel
+                output_bulk = BytesIO()
+                with pd.ExcelWriter(output_bulk, engine='openpyxl') as writer:
+                    df_export.to_excel(writer, index=False, sheet_name='Pendentes')
+                    
+                    # Aplicar proteção visual às colunas readonly (ID, descricao, centro, mes)
+                    workbook = writer.book
+                    worksheet = writer.sheets['Pendentes']
+                    
+                    # Estilo para células readonly (cinza claro)
+                    from openpyxl.styles import PatternFill, Protection
+                    readonly_fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
+                    
+                    # Aplicar às colunas A-D (ID, descricao, centro, mes) e última (data_atualizacao)
+                    for row in range(2, len(df_export) + 2):  # Skip header
+                        for col_idx in [1, 2, 3, 4]:  # A, B, C, D
+                            cell = worksheet.cell(row=row, column=col_idx)
+                            cell.fill = readonly_fill
+                        # Última coluna (data_atualizacao)
+                        last_col = len(cols_export)
+                        worksheet.cell(row=row, column=last_col).fill = readonly_fill
+                
+                st.download_button(
+                    label="📥 Baixar Pendentes para Edição",
+                    data=output_bulk.getvalue(),
+                    file_name=f"provisoes_pendentes_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    help="Baixe, edite os valores/status, e re-importe"
+                )
+            else:
+                st.warning("Nenhuma provisão PENDENTE para exportar.")
+        
+        with col_bulk2:
+            # --- UPLOAD ATUALIZAÇÕES ---
+            st.markdown("**📤 Importar Atualizações**")
+            
+            uploaded_bulk = st.file_uploader(
+                "Carregar Excel editado",
+                type=['xlsx'],
+                key="bulk_update_upload",
+                help="Arquivo deve conter coluna 'id' para identificação"
+            )
+            
+            if uploaded_bulk:
+                try:
+                    df_upload = pd.read_excel(uploaded_bulk)
+                    
+                    if 'id' not in df_upload.columns:
+                        st.error("❌ Arquivo inválido: coluna 'id' não encontrada.")
+                    else:
+                        st.success(f"✅ Arquivo lido: **{len(df_upload)}** registros encontrados.")
+                        
+                        # Preview
+                        with st.expander("👁️ Pré-visualização", expanded=False):
+                            st.dataframe(df_upload.head(10), use_container_width=True)
+                        
+                        # Confirmação
+                        if st.button("🚀 Confirmar Atualização em Lote", type="primary", use_container_width=True):
+                            with st.spinner("Processando atualizações..."):
+                                lista_dados = df_upload.to_dict(orient='records')
+                                
+                                updated, conflicts, erros = prov_service.atualizar_provisoes_em_lote(lista_dados)
+                                
+                                # Resultados
+                                col_res1, col_res2, col_res3 = st.columns(3)
+                                col_res1.metric("✅ Atualizados", updated)
+                                col_res2.metric("⚠️ Conflitos", conflicts)
+                                col_res3.metric("❌ Erros", len(erros) - conflicts)
+                                
+                                if updated > 0:
+                                    st.success(f"🎉 {updated} provisões atualizadas com sucesso!")
+                                    st.balloons()
+                                
+                                if erros:
+                                    with st.expander("⚠️ Detalhes de Erros/Conflitos"):
+                                        for err in erros:
+                                            st.write(f"• {err}")
+                                
+                                # Rerun para atualizar a lista
+                                if updated > 0:
+                                    st.rerun()
+                                    
+                except Exception as e:
+                    st.error(f"Erro ao processar arquivo: {e}")
+        
+        st.markdown("---")
+
         # GRID COM SELEÇÃO
         st.info("👆 Selecione uma linha na tabela para editar ou cancelar.")
         
@@ -449,3 +566,4 @@ with tab_lista:
 
     else:
         st.info("📭 Nenhum registro encontrado para os filtros selecionados.")
+

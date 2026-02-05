@@ -207,3 +207,97 @@ class ProvisioningService:
             return False
         finally:
             session.close()
+
+    def atualizar_provisoes_em_lote(self, lista_dados: List[dict]) -> Tuple[int, int, List[str]]:
+        """
+        Batch update provisions with optimistic locking.
+        
+        Args:
+            lista_dados: List of dicts with keys:
+                - id (required): Provision ID
+                - valor_estimado (optional): New value
+                - status (optional): New status (PENDENTE|REALIZADA|CANCELADA)
+                - numero_registro (optional): Registration number
+                - cadastrado_sistema (optional): Boolean or 'Sim'/'Não'
+                - data_atualizacao (optional): Timestamp for conflict detection
+        
+        Returns:
+            Tuple of (updated_count, conflict_count, errors_list)
+        """
+        session = get_session()
+        updated_count = 0
+        conflict_count = 0
+        erros = []
+        
+        try:
+            for idx, dados in enumerate(lista_dados):
+                try:
+                    prov_id = dados.get('id')
+                    if not prov_id:
+                        erros.append(f"Linha {idx+2}: ID não informado")
+                        continue
+                    
+                    # Fetch existing provision
+                    provisao = session.query(Provisao).filter(Provisao.id == int(prov_id)).first()
+                    
+                    if not provisao:
+                        erros.append(f"Linha {idx+2}: ID {prov_id} não encontrado")
+                        continue
+                    
+                    # Only allow updates to PENDENTE provisions
+                    if provisao.status != 'PENDENTE':
+                        erros.append(f"Linha {idx+2}: ID {prov_id} não está PENDENTE (status atual: {provisao.status})")
+                        continue
+                    
+                    # Optimistic Locking: Check if record was modified since download
+                    excel_timestamp = dados.get('data_atualizacao')
+                    if excel_timestamp and provisao.data_atualizacao:
+                        # Convert string to datetime if needed
+                        if isinstance(excel_timestamp, str):
+                            try:
+                                from datetime import datetime as dt
+                                excel_timestamp = dt.fromisoformat(excel_timestamp.replace('Z', '+00:00'))
+                            except:
+                                pass  # If parsing fails, skip conflict check
+                        
+                        # Compare timestamps (allow 1 second tolerance)
+                        if hasattr(excel_timestamp, 'timestamp') and hasattr(provisao.data_atualizacao, 'timestamp'):
+                            if abs(provisao.data_atualizacao.timestamp() - excel_timestamp.timestamp()) > 1:
+                                conflict_count += 1
+                                erros.append(f"Linha {idx+2}: CONFLITO - ID {prov_id} foi modificado por outro usuário")
+                                continue
+                    
+                    # Apply updates
+                    if 'valor_estimado' in dados and dados['valor_estimado'] is not None:
+                        provisao.valor_estimado = float(dados['valor_estimado'])
+                    
+                    if 'status' in dados and dados['status']:
+                        new_status = str(dados['status']).upper().strip()
+                        if new_status in ['PENDENTE', 'REALIZADA', 'CANCELADA']:
+                            provisao.status = new_status
+                    
+                    if 'numero_registro' in dados:
+                        provisao.numero_registro = str(dados['numero_registro']) if dados['numero_registro'] else None
+                    
+                    if 'cadastrado_sistema' in dados:
+                        val = dados['cadastrado_sistema']
+                        if isinstance(val, str):
+                            val = val.lower() in ['sim', 's', 'true', '1']
+                        provisao.cadastrado_sistema = bool(val)
+                    
+                    provisao.data_atualizacao = datetime.now()
+                    updated_count += 1
+                    
+                except Exception as e:
+                    erros.append(f"Linha {idx+2}: Erro - {str(e)}")
+            
+            if updated_count > 0:
+                session.commit()
+            
+            return updated_count, conflict_count, erros
+            
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
