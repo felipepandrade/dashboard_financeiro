@@ -72,10 +72,13 @@ Use este módulo para dizer ao sistema o que você *vai* gastar.
 
 - **Criar Provisão:** Preencha o formulário na aba lateral. O valor entrará imediatamente nos gráficos como "Provisionado".
 - **Editar/Atualizar:**
-    1. Vá na aba "Compromissos Ativos".
-    2. Use a seção "Gerenciar Item" no final da página.
-    3. Selecione o item e altere o valor ou status.
-    4. **Importante:** Ao mudar o status para `REALIZADA`, informe o "Número de Registro" (RC/Pedido). Isso sinaliza que o gasto já está no sistema oficial.
+  - **Edição Unitária:** Interface direta na grid com formulário.
+  - **Atualização em Lote (Bulk Update):**
+    - Exportação de Excel com colunas protegidas (ID, Metadados).
+    - Listas suspensas (Data Validation) para Status e Booleanos.
+    - **Controle de Concorrência:** Implementação de Optimistic Locking via timestamp (`data_atualizacao`). O sistema rejeita atualizações se o registro mudou no banco após o download.
+    - Transação Atômica: Ou atualiza todo o lote ou faz rollback em caso de erro.
+  - **Importante:** Ao mudar o status para `REALIZADA`, informe o "Número de Registro" (RC/Pedido).
 - **Exportar:** Use o botão "Exportar Excel" para gerar um relatório para a Controladoria.
 
 ### 3.3 Importação de Dados (Admin)

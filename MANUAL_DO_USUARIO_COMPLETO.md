@@ -87,16 +87,27 @@ Vai lançar 50 provisões de uma vez? Não digite uma por uma.
 
 ### 2.3 Gerenciando a Vida da Provisão (Aba "📋 Compromissos Ativos")
 
-Aqui vive o conceito de Shadow Ledger.
+Aqui vive o conceito de Shadow Ledger. Você tem duas formas de trabalhar:
 
-* **Tabela de Compromissos:** Mostra tudo que está pendente.
-* **Exportar Excel:** Cria um relatório pronto para enviar à Contabilidade no fechamento ("Accruals Report").
-* **Ação de Editar/Realizar:**
-  * Selecione um item no menu "Gerenciar Item" no fim da página.
-  * **Mudar Status:**
-    * `PENDENTE`: O serviço vai acontecer.
-    * `REALIZADA`: A nota fiscal chegou e já está no P&L oficial. **Atenção:** Ao marcar como Realizada, o valor sai da coluna amarela (Shadow) do gráfico e deveria aparecer na verde (Real).
-    * `CANCELADA`: Não vamos mais fazer o serviço. O valor sai do gráfico.
+**A. Edição via Tabela (Um a Um):**
+
+* Selecione um item na tabela.
+* Use o formulário "Gerenciar Item" no fim da página para alterar valor, status ou cancelar.
+
+**B. Atualização em Lote (Excel) - NOVIDADE 🚀:**
+Precisa atualizar o status de 50 itens de PENDENTE para REALIZADA?
+
+1. Clique em **"📥 Baixar Pendentes para Edição"**.
+2. Abra o Excel gerado. As colunas cinzas (ID, Descrição) são protegidas/informativas.
+3. Edite as colunas liberadas:
+   * **Valor Estimado:** Corrija o valor final.
+   * **Status:** Use a lista suspensa (PENDENTE, REALIZADA, CANCELADA).
+   * **Cadastrado Sistema:** Use a lista suspensa (VERDADEIRO/FALSO).
+   * **Número Registro:** Informe o RC/Pedido (Obrigatório se REALIZADA).
+4. Salve e faça o upload em **"📤 Importar Atualizações"**.
+5. O sistema validará conflitos (se alguém editou ao mesmo tempo) e atualizará tudo de uma vez.
+
+* **Exportar Relatório:** Use o botão "Exportar" simples do topo para gerar um snapshot apenas para leitura/envio.
 
 ---
 
