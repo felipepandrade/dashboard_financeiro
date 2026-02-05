@@ -282,7 +282,7 @@ class ProvisioningService:
                     if 'cadastrado_sistema' in dados:
                         val = dados['cadastrado_sistema']
                         if isinstance(val, str):
-                            val = val.lower() in ['sim', 's', 'true', '1']
+                            val = val.lower() in ['sim', 's', 'true', '1', 'verdadeiro']
                         provisao.cadastrado_sistema = bool(val)
                     
                     provisao.data_atualizacao = datetime.now()

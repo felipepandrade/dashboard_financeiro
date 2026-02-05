@@ -410,6 +410,7 @@ with tab_lista:
                     
                     # Estilo para células readonly (cinza claro)
                     from openpyxl.styles import PatternFill, Protection
+                    from openpyxl.worksheet.datavalidation import DataValidation
                     readonly_fill = PatternFill(start_color="E0E0E0", end_color="E0E0E0", fill_type="solid")
                     
                     # Aplicar às colunas A-D (ID, descricao, centro, mes) e última (data_atualizacao)
@@ -420,6 +421,33 @@ with tab_lista:
                         # Última coluna (data_atualizacao)
                         last_col = len(cols_export)
                         worksheet.cell(row=row, column=last_col).fill = readonly_fill
+                    
+                    # --- LISTAS SUSPENSAS (DATA VALIDATION) ---
+                    # Status (coluna F - index 6)
+                    status_validation = DataValidation(
+                        type="list",
+                        formula1='"PENDENTE,REALIZADA,CANCELADA"',
+                        allow_blank=False,
+                        showDropDown=False,  # False = SHOW dropdown (counterintuitive naming)
+                        showErrorMessage=True,
+                        errorTitle="Status Inválido",
+                        error="Selecione: PENDENTE, REALIZADA ou CANCELADA"
+                    )
+                    worksheet.add_data_validation(status_validation)
+                    status_validation.add(f"F2:F{len(df_export) + 1}")
+                    
+                    # Cadastrado Sistema (coluna H - index 8)
+                    cadastrado_validation = DataValidation(
+                        type="list",
+                        formula1='"VERDADEIRO,FALSO"',
+                        allow_blank=True,
+                        showDropDown=False,
+                        showErrorMessage=True,
+                        errorTitle="Valor Inválido",
+                        error="Selecione: VERDADEIRO ou FALSO"
+                    )
+                    worksheet.add_data_validation(cadastrado_validation)
+                    cadastrado_validation.add(f"H2:H{len(df_export) + 1}")
                 
                 st.download_button(
                     label="📥 Baixar Pendentes para Edição",
