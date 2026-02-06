@@ -32,6 +32,7 @@ from data.comparador import (
     get_comparativo_mensal,
     get_comparativo_por_centro,
     get_comparativo_por_conta,
+    get_comparativo_por_base,
     get_drill_down_ativo,
     get_kpis_gerais,
     get_top_desvios,
@@ -380,9 +381,10 @@ st.markdown("<br>", unsafe_allow_html=True)
 # TABS PRINCIPAIS
 # =============================================================================
 
-tab_mensal, tab_centro, tab_conta, tab_ativo = st.tabs([
+tab_mensal, tab_centro, tab_base, tab_conta, tab_ativo = st.tabs([
     "📅 Visão Mensal",
     "🏢 Por Centro de Custo",
+    "🏠 Por Base",
     "📊 Por Conta Contábil",
     "🔍 Drill-down por Ativo"
 ])
@@ -505,6 +507,129 @@ with tab_centro:
             )
     else:
         st.info("📭 Nenhum dado disponível para os filtros selecionados.")
+
+# =============================================================================
+# TAB: POR BASE OPERACIONAL
+# =============================================================================
+
+with tab_base:
+    st.markdown('<div class="section-header"><span class="section-title">Acompanhamento por Base Operacional</span></div>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    > 💡 **Dica**: Esta visão agrupa os centros de custo por **base operacional** (localidade), 
+    > facilitando o acompanhamento para as assistentes administrativas.
+    """)
+    
+    # Filtro de mês
+    mes_filtro_base = st.selectbox(
+        "Mês",
+        options=['Todos'] + MESES_ORDEM,
+        key="filtro_mes_base"
+    )
+    
+    mes_param_base = None if mes_filtro_base == 'Todos' else mes_filtro_base
+    df_base = get_comparativo_por_base(mes_param_base, 2026)
+    
+    if not df_base.empty:
+        # Gráfico de barras comparativo por base
+        st.markdown("#### 📊 Comparativo Orçado x Executado por Base")
+        
+        fig_base = go.Figure()
+        
+        fig_base.add_trace(go.Bar(
+            name='Orçado',
+            x=df_base['base'],
+            y=df_base['orcado'],
+            marker_color=CORES['orcado'],
+            text=[formatar_valor_brl(v, True) for v in df_base['orcado']],
+            textposition='auto'
+        ))
+        
+        fig_base.add_trace(go.Bar(
+            name='Realizado',
+            x=df_base['base'],
+            y=df_base['realizado'],
+            marker_color=CORES['realizado'],
+            text=[formatar_valor_brl(v, True) for v in df_base['realizado']],
+            textposition='auto'
+        ))
+        
+        fig_base.add_trace(go.Bar(
+            name='Provisionado',
+            x=df_base['base'],
+            y=df_base['provisionado'],
+            marker_color='#f59e0b',
+            text=[formatar_valor_brl(v, True) for v in df_base['provisionado']],
+            textposition='auto'
+        ))
+        
+        fig_base.update_layout(
+            barmode='group',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color=CORES['texto']),
+            legend=dict(orientation="h", y=1.02),
+            margin=dict(l=20, r=20, t=40, b=80),
+            height=400,
+            xaxis=dict(showgrid=False, tickangle=45),
+            yaxis=dict(showgrid=True, gridcolor='#334155', tickformat=',.0f')
+        )
+        
+        st.plotly_chart(fig_base, use_container_width=True)
+        
+        # KPIs por base
+        st.markdown("#### 📈 Estatísticas")
+        col_b1, col_b2, col_b3, col_b4 = st.columns(4)
+        
+        with col_b1:
+            total_bases = len(df_base)
+            st.metric("Total de Bases", total_bases)
+        
+        with col_b2:
+            total_centros = df_base['qtd_centros'].sum()
+            st.metric("Centros de Custo", int(total_centros))
+        
+        with col_b3:
+            bases_acima = (df_base['desvio_pct'] > 5).sum()
+            st.metric("Acima do Orçado (>5%)", bases_acima)
+        
+        with col_b4:
+            bases_abaixo = (df_base['desvio_pct'] < -5).sum()
+            st.metric("Abaixo do Orçado (<-5%)", bases_abaixo)
+        
+        # Tabela detalhada
+        st.markdown("#### 📋 Detalhamento por Base")
+        
+        df_display_base = df_base.copy()
+        df_display_base['Orçado'] = df_display_base['orcado'].apply(formatar_valor_brl)
+        df_display_base['Realizado'] = df_display_base['realizado'].apply(formatar_valor_brl)
+        df_display_base['Provisionado'] = df_display_base['provisionado'].apply(formatar_valor_brl)
+        df_display_base['Total Executado'] = df_display_base['total_executado'].apply(formatar_valor_brl)
+        df_display_base['Desvio'] = df_display_base['desvio'].apply(formatar_valor_brl)
+        df_display_base['Desvio %'] = df_display_base['desvio_pct'].apply(lambda x: f"{x:+.1f}%")
+        
+        st.dataframe(
+            df_display_base[['base', 'qtd_centros', 'Orçado', 'Provisionado', 'Realizado', 'Total Executado', 'Desvio', 'Desvio %']],
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                'base': st.column_config.TextColumn('Base', width='medium'),
+                'qtd_centros': st.column_config.NumberColumn('Centros', width='small')
+            }
+        )
+        
+        # Exportar
+        if st.button("📥 Exportar CSV", key="export_base"):
+            csv_base = df_base.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                "⬇️ Baixar",
+                data=csv_base,
+                file_name=f"comparativo_base_{mes_filtro_base}_{datetime.now():%Y%m%d}.csv",
+                mime="text/csv"
+            )
+    else:
+        st.warning("⚠️ Nenhum dado disponível para a visão por base.")
+        st.info("ℹ️ Verifique se o arquivo de centros de gasto possui a coluna 'BASE' preenchida.")
 
 # =============================================================================
 # TAB: POR CONTA CONTÁBIL

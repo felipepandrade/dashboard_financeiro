@@ -418,6 +418,66 @@ def get_comparativo_por_centro(mes: str = None, ano: int = 2026) -> pd.DataFrame
     return df
 
 
+def get_comparativo_por_base(mes: str = None, ano: int = 2026) -> pd.DataFrame:
+    """
+    Retorna comparativo orçado x realizado x provisionado AGRUPADO por BASE operacional.
+    
+    Esta função é útil para as assistentes administrativas que acompanham
+    centros de custo agrupados por localidade/base operacional.
+    
+    Args:
+        mes: Mês específico (JAN, FEV, etc.) ou None para total do ano
+        ano: Ano de referência
+    
+    Returns:
+        DataFrame com: base, qtd_centros, orcado, realizado, provisionado, desvio, desvio_pct
+    """
+    # Obter dados por centro
+    df_centro = get_comparativo_por_centro(mes, ano)
+    
+    if df_centro.empty:
+        return pd.DataFrame()
+    
+    # Carregar mapeamento de centros com base
+    df_centros = carregar_centros_gasto()
+    
+    if df_centros.empty or 'base' not in df_centros.columns:
+        return pd.DataFrame()
+    
+    # Criar mapeamento codigo -> base
+    mapa_base = df_centros.set_index('codigo')['base'].to_dict()
+    
+    # Adicionar coluna base ao comparativo
+    df_centro['base'] = df_centro['centro_gasto_codigo'].map(mapa_base)
+    
+    # Preencher bases nulas com "Não Identificada"
+    df_centro['base'] = df_centro['base'].fillna('Não Identificada')
+    
+    # Agrupar por base
+    df_agrupado = df_centro.groupby('base').agg({
+        'centro_gasto_codigo': 'count',  # Contagem de centros
+        'orcado': 'sum',
+        'realizado': 'sum',
+        'provisionado': 'sum'
+    }).reset_index()
+    
+    df_agrupado = df_agrupado.rename(columns={'centro_gasto_codigo': 'qtd_centros'})
+    
+    # Calcular totais executados e desvios
+    df_agrupado['total_executado'] = df_agrupado['realizado'] + df_agrupado['provisionado']
+    df_agrupado['desvio'] = df_agrupado['total_executado'] - df_agrupado['orcado']
+    df_agrupado['desvio_pct'] = np.where(
+        df_agrupado['orcado'] != 0,
+        (df_agrupado['desvio'] / df_agrupado['orcado']) * 100,
+        np.where(df_agrupado['total_executado'] != 0, 100, 0)
+    )
+    
+    # Ordenar por valor realizado (maiores primeiro)
+    df_agrupado = df_agrupado.sort_values('realizado', ascending=False)
+    
+    return df_agrupado
+
+
 def get_comparativo_por_conta(mes: str = None, ano: int = 2026) -> pd.DataFrame:
     """
     Retorna comparativo orçado x realizado por conta contábil.
