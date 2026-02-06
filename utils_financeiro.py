@@ -1291,10 +1291,15 @@ def processar_upload_pl(uploaded_file, ano: int = None) -> Tuple[bool, str, Dict
                 # Remover dados existentes DESSE ano para evitar duplicação
                 df_existente = st.session_state['pl_df']
                 if 'ano' in df_existente.columns:
+                    # Remover TODOS os dados desse ano (incluindo Realizado do banco e outros tipos)
                     df_existente = df_existente[df_existente['ano'] != ano]
                 
-                # Concatenar
-                st.session_state['pl_df'] = pd.concat([df_existente, df], ignore_index=True)
+                # Se ainda há dados de outros anos, concatenar; senão, substituir
+                if not df_existente.empty:
+                    st.session_state['pl_df'] = pd.concat([df_existente, df], ignore_index=True)
+                else:
+                    st.session_state['pl_df'] = df
+
             
             # --- Lógica de Persistência do Razão ---
             # Para o Razão, assumimos que o upload substitui ou adiciona. 

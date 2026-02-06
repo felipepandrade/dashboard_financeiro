@@ -41,12 +41,8 @@ razao_df = st.session_state.get('razao_df')
 api_key = st.session_state.get('api_key', '')
 ai_provider = st.session_state.get('ai_provider', 'Gemini (Google)')
 
-# Tentar hidratação automática do Banco se vazio
-if pl_df is None:
-    from utils_financeiro import garantir_dados_sessao
-    if garantir_dados_sessao():
-        pl_df = st.session_state['pl_df']
-        st.toast("Dados históricos carregados do banco.", icon="💾")
+# NOTA: Não há mais hidratação automática do banco.
+# Este módulo usa APENAS dados do upload de P&L para garantir consistência.
 
 if pl_df is None:
     st.warning("⚠️ **Nenhum dado de P&L carregado.**")
@@ -59,6 +55,14 @@ if pl_df is None:
 # =============================================================================
 # PROCESSAMENTO INICIAL
 # =============================================================================
+
+# DEDUPLICAÇÃO: Garantir que não há registros duplicados no DataFrame
+# Isso pode acontecer se dados do banco forem mesclados incorretamente com upload
+if 'codigo_centro_gasto' in pl_df.columns and 'mes' in pl_df.columns and 'tipo_valor' in pl_df.columns:
+    colunas_chave = ['codigo_centro_gasto', 'conta_contabil', 'mes', 'tipo_valor', 'ano']
+    colunas_existentes = [c for c in colunas_chave if c in pl_df.columns]
+    if colunas_existentes:
+        pl_df = pl_df.drop_duplicates(subset=colunas_existentes, keep='last')
 
 # Separar custos e financeiro
 # NOTA: codigo_centro_gasto é STRING após processamento do ETL
@@ -86,7 +90,12 @@ numero_meses_passados = MESES_ORDEM.index(ultimo_mes_realizado) + 1 if ultimo_me
 st.markdown('<div class="section-header"><span class="section-title">Análise de Performance (Overview)</span></div>', unsafe_allow_html=True)
 
 with st.expander("🔍 Filtros Globais", expanded=False):
-    col1_filter, col2_filter, col3_filter = st.columns(3)
+    col0_filter, col1_filter, col2_filter, col3_filter = st.columns(4)
+    
+    with col0_filter:
+        # Filtro de Ano - essencial para evitar soma de múltiplos anos
+        anos_disponiveis = sorted(df_custos['ano'].unique().tolist(), reverse=True) if 'ano' in df_custos.columns else [2025]
+        ano_selecionado = st.selectbox("📅 Ano", anos_disponiveis, index=0)
     
     with col1_filter:
         lista_centros_custo = ['Visão Geral (Consolidado)'] + sorted(df_custos['centro_gasto_nome'].dropna().unique().tolist())
@@ -103,6 +112,12 @@ with st.expander("🔍 Filtros Globais", expanded=False):
 # FILTRAGEM
 df_custos_filtrado = df_custos.copy()
 razao_filtrado = razao_df.copy() if razao_df is not None else pd.DataFrame()
+
+# Filtro de Ano (PRIMEIRO - evita soma de múltiplos anos)
+if 'ano' in df_custos_filtrado.columns:
+    df_custos_filtrado = df_custos_filtrado[df_custos_filtrado['ano'] == ano_selecionado]
+    if not razao_filtrado.empty and 'ano' in razao_filtrado.columns:
+        razao_filtrado = razao_filtrado[razao_filtrado['ano'] == ano_selecionado]
 
 # Filtro Centro de Custo
 if centro_custo_selecionado != 'Visão Geral (Consolidado)':
