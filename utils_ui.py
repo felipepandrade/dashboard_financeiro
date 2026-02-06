@@ -326,3 +326,21 @@ def formatar_valor_brl(valor: float, mostrar_simbolo: bool = True) -> str:
     if valor is None: return "R$ 0,00"
     msg = f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     return msg
+
+
+def aplicar_tema_plotly(fig):
+    """
+    Aplica o tema dark padrão a uma figura Plotly.
+    
+    Args:
+        fig: go.Figure do Plotly
+        
+    Returns:
+        go.Figure com tema aplicado
+    """
+    return fig.update_layout(
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font={'color': "white"}
+    )

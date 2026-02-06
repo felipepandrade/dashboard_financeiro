@@ -52,7 +52,7 @@ MES_PARA_COLUNA_ORC = {
 # FUNÇÕES DE AGREGAÇÃO DO ORÇAMENTO
 # =============================================================================
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=900)
 def get_orcamento_agregado_por_mes() -> pd.DataFrame:
     """
     Agrega o orçamento V1 2026 por mês.
@@ -75,7 +75,7 @@ def get_orcamento_agregado_por_mes() -> pd.DataFrame:
     return pd.DataFrame(dados)
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=900)
 def get_orcamento_por_centro(mes: str = None) -> pd.DataFrame:
     """
     Agrega o orçamento por centro de custo.
@@ -118,7 +118,7 @@ def get_orcamento_por_centro(mes: str = None) -> pd.DataFrame:
     return df_agrupado
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=900)
 def get_orcamento_por_conta(mes: str = None) -> pd.DataFrame:
     """
     Agrega o orçamento por conta contábil.
@@ -166,7 +166,7 @@ def get_orcamento_por_conta(mes: str = None) -> pd.DataFrame:
 # FUNÇÕES DE AGREGAÇÃO DO REALIZADO
 # =============================================================================
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=900)
 def get_realizado_agregado_por_mes(ano: int = 2026) -> pd.DataFrame:
     """
     Agrega os lançamentos realizados por mês.
@@ -184,7 +184,7 @@ def get_realizado_agregado_por_mes(ano: int = 2026) -> pd.DataFrame:
     return pd.DataFrame(dados)
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=900)
 def get_realizado_por_centro(mes: str = None, ano: int = 2026) -> pd.DataFrame:
     """
     Agrega lançamentos realizados por centro de custo.
@@ -213,7 +213,7 @@ def get_realizado_por_centro(mes: str = None, ano: int = 2026) -> pd.DataFrame:
     return df_agrupado
 
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=900)
 def get_realizado_por_conta(mes: str = None, ano: int = 2026) -> pd.DataFrame:
     """
     Agrega lançamentos realizados por conta contábil.

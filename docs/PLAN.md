@@ -1,55 +1,219 @@
-# Plan for "Lançamentos" Batch Import Improvement
+# Plano de Otimização de Performance
 
-## Goal
+> **Projeto:** Dashboard Financeiro v2.0  
+> **Ambiente:** Streamlit Cloud + Neon (PostgreSQL Serverless)  
+> **Origem:** [performance_audit_report.md](file:///C:/Users/WN6241/.gemini/antigravity/brain/58e2fd79-83c2-401b-b562-5d3a537b3e71/performance_audit_report.md)
 
-Automatically fill "Regional" and "Base" fields during the batch import of provisions (importação em lote) in the "Lançamentos" module, ensuring the database is complete for both single and batch entries.
+---
 
-## Proposed Changes
+## 📋 Sumário do Plano
 
-### 1. Update `services/provisioning_service.py`
+| Fase | Foco | Duração | Agentes |
+|------|------|---------|---------|
+| 1 | Quick Wins - DB & Cache | 1-2 dias | performance-optimizer, backend-specialist |
+| 2 | Lazy Loading & Imports | 1 dia | backend-specialist |
+| 3 | Refatoração Estrutural | 2-3 dias | backend-specialist, test-engineer |
 
-The `ProvisioningService` currently ignores `regional` and `base` fields when creating provisions. We need to update it to persist these fields into the `Provisao` table.
+**Total Estimado:** 4-6 dias de trabalho
 
-#### [MODIFY] `services/provisioning_service.py`
+---
 
-- In `criar_provisao(self, dados: dict)`:
-  - Extract `regional` and `base` from `dados` (if present).
-  - Pass them to the `Provisao` constructor.
-- In `criar_provisoes_em_lote(self, lista_dados: List[dict])`:
-  - Extract `regional` and `base` from `dados`.
-  - Pass them to the `Provisao` constructor.
+## 🚨 Itens para Revisão do Usuário
 
-### 2. Update `pages/02_📝_Lancamentos.py`
+> [!IMPORTANT]
+> Decisões que requerem confirmação antes da implementação:
 
-The UI module handles the file upload and conversion to dictionary. We will add the logic to look up "Regional" and "Base" from the `df_centros` reference dataframe before calling the service.
+1. **Pool de Conexões:** Reduzir de ilimitado para `pool_size=3, max_overflow=2`?
+2. **TTL de Cache:** Aumentar de 60-300s para 3600s (1 hora)?
+3. **Refatoração de utils_financeiro.py:** Dividir em módulos menores?
 
-#### [MODIFY] `pages/02_📝_Lancamentos.py`
+---
 
-- In the "Importação em Lote" tab (`with tab_import:`):
-  - Before calling `prov_service.criar_provisoes_em_lote(lista_dados)`:
-  - Iterate over `lista_dados`.
-  - For each record, use `centro_gasto_codigo` to find the corresponding row in `df_centros` (which is already loaded in the page scope).
-  - Retrieve `regional` and `base`.
-  - Populate these keys in the record dictionary.
+## Fase 1: Quick Wins - Database & Cache (1-2 dias)
 
-## Verification Plan
+### 1.1 Connection Pooling Singleton
 
-### Automated Verification Script
+**Problema:** `get_engine()` recria engine a cada chamada (52+ sessões).
 
-Since manual UI testing is limited in this environment, I will create a python script `scripts/verify_provisao_import.py` to simulate the process.
+**Arquivo:** [database/models.py](file:///c:/Aplicativos%20Desenvolvidos/dashboard_financeiro/database/models.py)
 
-**Script Steps:**
+**Alterações:**
 
-1. Setup specific database session (using existing `get_session`).
-2. Instantiate `ProvisioningService`.
-3. Create a mock list of import data (dicts) containing `centro_gasto_codigo` but MISSING `regional` / `base`.
-4. Perform the logic that will be in the UI (lookup `regional`/`base` from a mock `df_centros` or the actual one if loadable).
-5. Call `criar_provisoes_em_lote` with the enriched data.
-6. Query the database (`Provisao` table) created by the script (or valid test DB) to verify the new records have `regional` and `base` correctly populated.
-7. Clean up the test data.
+```python
+# ANTES - Linha 46-89
+def get_engine():
+    ...
+    return create_engine(db_url, pool_pre_ping=True, pool_recycle=300)
 
-### Manual Validation (Post-Implementation)
+# DEPOIS
+@st.cache_resource
+def get_engine():
+    ...
+    return create_engine(
+        db_url,
+        pool_pre_ping=True,
+        pool_recycle=280,    # Antes do auto-suspend do Neon (5min)
+        pool_size=3,         # Limitar conexões ativas
+        max_overflow=2       # Burst controlado
+    )
+```
 
-- If the user has access to the UI:
-  1. Upload a template Excel with a known Centro de Gasto.
-  2. Verify in the "Compromissos Ativos" list (or via export) that Regional/Base are filled.
+**Impacto:** 🔴 Alto - Evita esgotamento de conexões no Neon
+
+---
+
+### 1.2 Aumentar TTL de Cache
+
+**Problema:** TTLs curtos (60-300s) causam reprocessamento frequente.
+
+**Arquivo:** [data/comparador.py](file:///c:/Aplicativos%20Desenvolvidos/dashboard_financeiro/data/comparador.py)
+
+**Alterações:**
+
+| Linha | Atual | Proposto |
+|-------|-------|----------|
+| 55, 78, 121 | `ttl=300` | `ttl=3600` |
+| 169, 187, 216 | `ttl=60` | `ttl=600` |
+
+**Impacto:** 🔴 Alto - Reduz queries ao DB em ~80%
+
+---
+
+### 1.3 Centralizar Layout Plotly
+
+**Problema:** Código duplicado em 5+ arquivos.
+
+**Arquivo:** [utils_ui.py](file:///c:/Aplicativos%20Desenvolvidos/dashboard_financeiro/utils_ui.py)
+
+**Adicionar:**
+
+```python
+def aplicar_tema_plotly(fig):
+    """Aplica tema dark padrão a figura Plotly."""
+    return fig.update_layout(
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font={'color': "white"}
+    )
+```
+
+**Impacto:** 🟢 Baixo - Manutenibilidade
+
+---
+
+## Fase 2: Lazy Loading & Imports (1 dia)
+
+### 2.1 Lazy Imports para Bibliotecas Pesadas
+
+**Problema:** sklearn, statsmodels, genai carregados no cold start (~3s).
+
+**Arquivo:** [utils_financeiro.py](file:///c:/Aplicativos%20Desenvolvidos/dashboard_financeiro/utils_financeiro.py)
+
+**Alterações:**
+
+```python
+# ANTES - Linhas 30-35 (imports globais)
+from sklearn.linear_model import LinearRegression
+from statsmodels.tsa.seasonal import seasonal_decompose
+from google import generativeai as genai
+
+# DEPOIS - Imports locais dentro das funções
+def _seasonal_decompose(self, periods):
+    from statsmodels.tsa.seasonal import seasonal_decompose
+    ...
+
+def get_ai_chat_response(messages, api_key, provider):
+    if 'Gemini' in provider:
+        from google import generativeai as genai
+    ...
+```
+
+**Impacto:** 🟡 Médio - Cold start ~2s mais rápido
+
+---
+
+## Fase 3: Refatoração Estrutural (2-3 dias)
+
+### 3.1 Dividir utils_financeiro.py
+
+**Problema:** Arquivo monolítico com 1416 linhas e 48 funções.
+
+**Estrutura Proposta:**
+
+```
+utils/
+├── __init__.py          # Re-exports para compatibilidade
+├── etl.py               # Funções de processamento (linhas 67-370)
+├── validation.py        # Schemas Pandera (linhas 370-600)
+├── charts.py            # Gráficos Plotly (linhas 600-750)
+├── ai.py                # Integração Gemini/OpenAI (linhas 750-830)
+├── forecasting.py       # Modelos matemáticos (linhas 830-1080)
+└── persistence.py       # DB Integration (linhas 1230-1416)
+```
+
+**Impacto:** 🟡 Médio - Manutenibilidade e imports seletivos
+
+---
+
+### 3.2 Cache de Figuras Plotly
+
+**Problema:** 23+ gráficos recriados a cada interação.
+
+**Arquivos:** Páginas 01, 03, 06
+
+**Padrão a implementar:**
+
+```python
+@st.cache_data
+def _criar_grafico_cached(df_hash: str, params: dict):
+    fig = go.Figure()
+    ...
+    return fig
+
+def criar_grafico_comparativo_mensal(df):
+    df_hash = hash(df.to_json())
+    return _criar_grafico_cached(df_hash, {...})
+```
+
+---
+
+## 📊 Verificação
+
+### Scripts de Validação
+
+```bash
+# Executar após cada fase
+streamlit run Home.py --profile   # Verificar cold start
+python -c "from utils_financeiro import *"  # Verificar imports
+```
+
+### Métricas Target
+
+| Métrica | Antes | Target |
+|---------|-------|--------|
+| Cold Start | ~4-6s | < 2s |
+| Rerun com filtro | ~1-2s | < 500ms |
+| Conexões DB ativas | Ilimitado | ≤ 5 |
+
+---
+
+## 🔴 Agentes Necessários
+
+| # | Agente | Responsabilidade | Fase |
+|---|--------|------------------|------|
+| 1 | `performance-optimizer` | Validar métricas antes/depois | 1, 2, 3 |
+| 2 | `backend-specialist` | Implementar alterações em DB e services | 1, 2, 3 |
+| 3 | `test-engineer` | Garantir que nada quebrou | 3 |
+
+---
+
+## ✅ Checklist de Aprovação
+
+- [ ] **Fase 1.1:** Confirma `pool_size=3, max_overflow=2`?
+- [ ] **Fase 1.2:** Confirma TTL de 1 hora para dados orçamentários?
+- [ ] **Fase 3.1:** Deseja dividir utils_financeiro.py em módulos?
+
+---
+
+*Aguardando aprovação para iniciar implementação.*

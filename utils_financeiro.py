@@ -28,10 +28,8 @@ from sqlalchemy import text
 import pandera as pa
 from pandera import Column, Check, DataFrameSchema
 
-# --- Análise de Série Temporal ---
-from statsmodels.tsa.seasonal import seasonal_decompose
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.stattools import adfuller
+# --- Análise de Série Temporal (LAZY IMPORT - carregado apenas quando usado) ---
+# statsmodels: seasonal_decompose, SARIMAX, adfuller
 import matplotlib.pyplot as plt
 
 # --- Visualização ---
@@ -39,11 +37,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# --- IA e ML ---
-import google.generativeai as genai
-# from openai import OpenAI # Removed
-from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error, mean_absolute_error
-from sklearn.linear_model import LinearRegression
+# --- IA e ML (LAZY IMPORT - carregado apenas quando usado) ---
+# google.generativeai as genai (carregado em get_ai_chat_response)
+# sklearn: LinearRegression, métricas (carregado nas funções de forecast)
 
 warnings.filterwarnings('ignore')
 
@@ -678,9 +674,8 @@ def plot_robust_forecast(df, date_col, value_col, periods=3):
         if len(ts) < 4:
             return None # Muito poucos dados
             
-        # Estimativa de tendência linear simples
+        # Lazy import - carregado apenas quando necessário
         from sklearn.linear_model import LinearRegression
-        import numpy as np
         
         X = np.arange(len(ts)).reshape(-1, 1)
         y = ts_abs.values
@@ -765,6 +760,9 @@ def get_ai_chat_response(messages: List[Dict], api_key: str, provider: str) -> s
         Resposta da IA como string
     """
     try:
+        # Lazy import - carregado apenas quando necessário
+        import google.generativeai as genai
+        
         # Configurar API Key
         genai.configure(api_key=api_key)
         

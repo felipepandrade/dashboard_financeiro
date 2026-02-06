@@ -28,6 +28,7 @@ from sqlalchemy.orm import sessionmaker
 # =============================================================================
 
 import os
+import streamlit as st
 from dotenv import load_dotenv
 
 # Carregar variáveis de ambiente (.env) se existirem
@@ -43,9 +44,10 @@ DATABASE_PATH = DATABASE_DIR / "lancamentos_2026.db"
 Base = declarative_base()
 
 
+@st.cache_resource
 def get_engine():
     """
-    Retorna o engine SQLAlchemy.
+    Retorna o engine SQLAlchemy (singleton via cache_resource).
     Prioriza DATABASE_URL (Env ou Secrets).
     Caso contrário, usa SQLite local.
     """
@@ -54,7 +56,6 @@ def get_engine():
     # Tentativa de fallback para Streamlit Secrets (Cloud)
     if not db_url:
         try:
-            import streamlit as st
             if hasattr(st, "secrets"):
                 # 1. Tenta acesso direto (raiz)
                 if "DATABASE_URL" in st.secrets:
@@ -63,7 +64,7 @@ def get_engine():
                 elif "general" in st.secrets and "DATABASE_URL" in st.secrets["general"]:
                     db_url = st.secrets["general"]["DATABASE_URL"]
         except Exception:
-            pass # Ignora erros de importação ou contexto fora do Streamlit
+            pass  # Ignora erros de importação ou contexto fora do Streamlit
 
     if db_url:
         # Configuração para Postgres (Neon/Production)
@@ -74,8 +75,10 @@ def get_engine():
         return create_engine(
             db_url,
             echo=False,
-            pool_pre_ping=True, # Evita desconexões silenciosas
-            pool_recycle=300    # Renova conexões a cada 5 min
+            pool_pre_ping=True,   # Evita desconexões silenciosas
+            pool_recycle=280,     # Renova conexões antes do auto-suspend do Neon (5min)
+            pool_size=4,          # Conexões permanentes no pool
+            max_overflow=5        # Conexões extras em picos de demanda
         )
     else:
         # Configuração para SQLite (Local/Fallback)
@@ -100,8 +103,6 @@ def get_session():
     Session = sessionmaker(bind=engine)
     return Session()
 
-
-import streamlit as st
 
 @st.cache_resource
 def init_db():
