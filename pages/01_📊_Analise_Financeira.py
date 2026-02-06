@@ -61,8 +61,9 @@ if pl_df is None:
 # =============================================================================
 
 # Separar custos e financeiro
-df_custos = pl_df[pl_df['codigo_centro_gasto'] != 0].copy()
-df_financeiro = pl_df[pl_df['codigo_centro_gasto'] == 0].copy()
+# NOTA: codigo_centro_gasto é STRING após processamento do ETL
+df_custos = pl_df[pl_df['codigo_centro_gasto'] != '0'].copy()
+df_financeiro = pl_df[pl_df['codigo_centro_gasto'] == '0'].copy()
 
 # Calcular último mês realizado
 ultimo_mes_realizado = None
