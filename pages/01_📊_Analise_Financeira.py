@@ -286,17 +286,29 @@ with tab_analitico:
         # Treemap com valores absolutos para visualização de área
         df_treemap = df_custos_filtrado.query("tipo_valor == 'Realizado'")
         if not df_treemap.empty:
+            df_treemap = df_treemap.copy()
             df_treemap['valor_abs'] = df_treemap['valor'].abs()
             df_treemap = df_treemap[df_treemap['valor_abs'] > 0] # Filtrar zeros
+            # Filtrar valores nulos para evitar erro no treemap
+            df_treemap = df_treemap.dropna(subset=['centro_gasto_nome', 'conta_contabil'])
+            df_treemap = df_treemap[df_treemap['centro_gasto_nome'].notna() & (df_treemap['centro_gasto_nome'] != '')]
             
-            fig_tm = px.treemap(
-                df_treemap, path=[px.Constant("Total"), 'centro_gasto_nome', 'conta_contabil'],
-                values='valor_abs', title='Hierarquia de Custos (Realizado Absoluto)', color='valor_abs', color_continuous_scale='RdYlGn_r'
-            )
-            fig_tm.update_layout(template="plotly_dark")
-            st.plotly_chart(fig_tm, use_container_width=True)
+            # Agregar valores duplicados para evitar erro de hierarquia no treemap
+            if not df_treemap.empty:
+                df_treemap = df_treemap.groupby(['centro_gasto_nome', 'conta_contabil'], as_index=False)['valor_abs'].sum()
+            
+            if not df_treemap.empty:
+                fig_tm = px.treemap(
+                    df_treemap, path=[px.Constant("Total"), 'centro_gasto_nome', 'conta_contabil'],
+                    values='valor_abs', title='Hierarquia de Custos (Realizado Absoluto)', color='valor_abs', color_continuous_scale='RdYlGn_r'
+                )
+                fig_tm.update_layout(template="plotly_dark")
+                st.plotly_chart(fig_tm, use_container_width=True)
+            else:
+                st.info("Sem dados com centro de custo mapeado para exibir Treemap.")
         else:
             st.info("Sem dados para exibir Treemap.")
+
 
 # =============================================================================
 # ABA 3: ESTRATÉGICO (Forecast + IA)
