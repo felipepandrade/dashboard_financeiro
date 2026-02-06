@@ -142,6 +142,10 @@ def processar_upload_completo(uploaded_file, ano: int = None) -> Tuple[pd.DataFr
         }
         
         df_custos['centro_gasto_nome'] = df_custos['codigo_centro_gasto'].map(mapa_centro_custo)
+        
+        # Converter codigo do df_financeiro para string também (garantir consistência de tipos)
+        df_financeiro['codigo_centro_gasto'] = '0'
+        
         df_processado = pd.concat([df_custos, df_financeiro], ignore_index=True)
         colunas_identificadoras = ['codigo_centro_gasto', 'centro_gasto_nome', 'conta_contabil']
         
